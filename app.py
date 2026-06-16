@@ -12,14 +12,14 @@ from reportlab.lib import colors
 # Configuração da página Streamlit
 st.set_page_config(page_title="Plano de Ação 5W2H", layout="wide")
 
-# Conexão com o banco de dados
+# Conexão segura usando st.secrets
 def get_db_connection():
     return mysql.connector.connect(
-        host="127.0.0.1",
-        user="root",
-        password="",
-        database="sistema_gestao",
-        port=3306
+        host=st.secrets["mysql"]["host"],
+        user=st.secrets["mysql"]["user"],
+        password=st.secrets["mysql"]["password"],
+        database=st.secrets["mysql"]["database"],
+        port=int(st.secrets["mysql"]["port"])
     )
 
 # Função para gerar PDF
@@ -73,12 +73,11 @@ if not st.session_state['logado']:
 
 # --- PAINEL PRINCIPAL ---
 else:
-    # Cabeçalho e Logout
     col_tit, col_log = st.columns([4, 1])
     with col_tit:
         st.title("Plano de Ação Estratégico 5W2H")
     with col_log:
-        if st.button("Sair (Logout)"):
+        if st.button("Sair (Logout)", use_container_width=True):
             st.session_state['logado'] = False
             st.rerun()
 
@@ -117,7 +116,6 @@ else:
         porque = st.text_input("Por que")
         onde = st.text_input("Onde")
         
-        # Mapeamento de usuários para o selectbox
         dict_usuarios = {u['nome']: u['id_usuario'] for u in usuarios}
         nome_resp = st.selectbox("Responsável (Quem) *", list(dict_usuarios.keys())) if dict_usuarios else st.selectbox("Responsável", ["Nenhum cadastrado"])
         
@@ -162,7 +160,6 @@ else:
                 st.write(f"**Quem:** {a['nome']} | **Como:** {a['como']} | **Detalhe:** {a['quando_detalhe']}")
                 st.write(f"**ID da Ação para edição:** `{a['id_acao']}`")
                 
-                # Botão de exclusão individual
                 if st.button(f"❌ Excluir Ação #{a['id_acao']}", key=f"del_{a['id_acao']}"):
                     try:
                         conn = get_db_connection()
