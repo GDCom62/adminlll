@@ -12,18 +12,18 @@ from reportlab.lib import colors
 # Configuração da página Streamlit
 st.set_page_config(page_title="Plano de Ação", layout="wide")
 
-# CONFIGURAÇÃO DO LOGIN FIXO (Suas diretrizes mantidas)
+# CONFIGURAÇÃO DO LOGIN FIXO
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# Conexão segura usando st.secrets
+# CONEXÃO DIRETA COM A CLEVER CLOUD (Preencha aqui com os dados reais)
 def get_db_connection():
     return mysql.connector.connect(
-        host=st.secrets["mysql"]["host"],
-        user=st.secrets["mysql"]["user"],
-        password=st.secrets["mysql"]["password"],
-        database=st.secrets["mysql"]["database"],
-        port=int(st.secrets["mysql"]["port"])
+        host="b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com",
+        user="uaoxaabon9ifpx5x",
+        password="uaoxaabon9ifpx5x",
+        database="b7dxmekynipigcv1sftu",
+        port=3306
     )
 
 # Função para gerar PDF
@@ -78,21 +78,36 @@ else:
             st.session_state['logado'] = False
             st.rerun()
 
-    # Buscar dados do banco de forma 100% silenciosa
+    # Buscar dados do banco de forma resiliente (Testa letras maiúsculas e minúsculas)
     acoes, usuarios = [], []
+    erro_banco = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        cursor.execute("SELECT A.*, U.nome FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
-        acoes = cursor.fetchall()
-        
-        cursor.execute("SELECT * FROM Usuarios")
-        usuarios = cursor.fetchall()
+        # Tenta buscar os usuários (testando minúsculo se falhar)
+        try:
+            cursor.execute("SELECT * FROM Usuarios")
+            usuarios = cursor.fetchall()
+        except Exception:
+            cursor.execute("SELECT * FROM usuarios")
+            usuarios = cursor.fetchall()
+            
+        # Tenta buscar as ações
+        try:
+            cursor.execute("SELECT A.*, U.nome FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
+            acoes = cursor.fetchall()
+        except Exception:
+            cursor.execute("SELECT a.*, u.nome FROM acoes a JOIN usuarios u ON a.id_responsavel = u.id_usuario ORDER BY a.prazo ASC")
+            acoes = cursor.fetchall()
+            
         conn.close()
-    except Exception:
-        # Erros técnicos ocultados da tela para manter o design limpo
-        pass
+    except Exception as e:
+        erro_banco = str(e)
+
+    # Exibe o erro real de conexão se houver, ajudando a descobrir o problema
+    if erro_banco:
+        st.error(f"Erro de conexão com a Clever Cloud: {erro_banco}")
 
     # Botão para baixar PDF
     if acoes:
@@ -114,7 +129,13 @@ else:
         porque = st.text_input("Por que")
         onde = st.text_input("Onde")
         
-        dict_usuarios = {u['nome']: u['id_usuario'] for u in usuarios}
+        dict_usuarios = {u['nome']: u['id_usuario'] for u in usuarios or u.get('nome') and [{'nome': u['nome'], 'id_usuario': u['id_usuario']} for u in usuarios]}
+        # Garante compatibilidade de chaves
+        if usuarios and 'nome' in usuarios[0]:
+            dict_usuarios = {u['nome']: u['id_usuario'] for u in usuarios}
+        elif usuarios and 'NOME' in usuarios[0]:
+            dict_usuarios = {u['NOME']: u['ID_USUARIO'] for u in usuarios}
+            
         nome_resp = st.selectbox("Responsável (Quem) *", list(dict_usuarios.keys())) if dict_usuarios else st.selectbox("Responsável", ["Nenhum usuário localizado no banco"])
         
         prazo = st.date_input("Prazo *", value=datetime.now().date())
@@ -136,18 +157,33 @@ else:
                 try:
                     conn = get_db_connection()
                     cursor = conn.cursor()
+                    
+                    # Detecta o nome correto da tabela para salvar
+                    tabela_acoes = "Acoes"
+                    try:
+                        cursor.execute("SELECT 1 FROM Acoes LIMIT 1")
+                    except Exception:
+                        tabela_acoes = "acoes"
+
                     if id_acao and id_acao.strip() != "":
-                        sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
+                        if tabela_acoes == "Acoes":
+                            sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
+                        else:
+                            sql = "UPDATE acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
                         cursor.execute(sql, dados + (id_acao,))
                     else:
-                        sql = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                        if tabela_acoes == "Acoes":
+                            sql = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                        else:
+                            sql = "INSERT INTO acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
                         cursor.execute(sql, dados)
+                        
                     conn.commit()
                     conn.close()
                     st.success("Ação salva com sucesso!")
                     st.rerun()
-                except Exception:
-                    st.error("Não foi possível salvar os dados. Verifique a conexão com o banco.")
+                except Exception as e:
+                    st.error(f"Não foi possível salvar os dados. Erro: {e}")
 
     st.write("---")
 
@@ -155,21 +191,35 @@ else:
     st.subheader("Ações Cadastradas")
     if acoes:
         for a in acoes:
-            with st.expander(f"📌 {a['descricao_acao']} - Prazo: {a['prazo']} ({a['status']})"):
-                st.write(f"**Por que:** {a['porque']} | **Onde:** {a['onde']}")
-                st.write(f"**Quem:** {a['nome']} | **Como:** {a['como']} | **Detalhe:** {a['quando_detalhe']}")
-                st.write(f"**ID da Ação para edição:** `{a['id_acao']}`")
+            # Garante leitura independente de maiúsculas/minúsculas vindas do banco
+            d_acao = a.get('descricao_acao') or a.get('DESCRICAO_ACAO')
+            p_praz = a.get('prazo') or a.get('PRAZO')
+            s_stat = a.get('status') or a.get('STATUS')
+            p_porq = a.get('porque') or a.get('PORQUE')
+            o_onde = a.get('onde') or a.get('ONDE')
+            n_nome = a.get('nome') or a.get('NOME')
+            c_como = a.get('como') or a.get('COMO')
+            q_deta = a.get('quando_detalhe') or a.get('QUANDO_DETALHE')
+            i_id   = a.get('id_acao') or a.get('ID_ACAO')
+            
+            with st.expander(f"📌 {d_acao} - Prazo: {p_praz} ({s_stat})"):
+                st.write(f"**Por que:** {p_porq} | **Onde:** {o_onde}")
+                st.write(f"**Quem:** {n_nome} | **Como:** {c_como} | **Detalhe:** {q_deta}")
+                st.write(f"**ID da Ação para edição:** `{i_id}`")
                 
-                if st.button(f"❌ Excluir Ação #{a['id_acao']}", key=f"del_{a['id_acao']}"):
+                if st.button(f"❌ Excluir Ação #{i_id}", key=f"del_{i_id}"):
                     try:
                         conn = get_db_connection()
                         cursor = conn.cursor()
-                        cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (a['id_acao'],))
+                        try:
+                            cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (i_id,))
+                        except Exception:
+                            cursor.execute("DELETE FROM acoes WHERE id_acao = %s", (i_id,))
                         conn.commit()
                         conn.close()
                         st.success("Excluído!")
                         st.rerun()
-                    except Exception:
-                        st.error("Erro ao tentar excluir do banco de dados.")
+                    except Exception as e:
+                        st.error(f"Erro ao tentar excluir: {e}")
     else:
-        st.info("Nenhum registro carregado (Aguardando conexão ativa com o banco de dados MySQL).")
+        st.info("Nenhum registro carregado (Banco conectado, mas sem ações criadas).")
