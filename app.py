@@ -73,7 +73,7 @@ if not st.session_state['logado']:
 
 # --- PAINEL PRINCIPAL ---
 else:
-    col_tit, col_log = st.columns([4, 1])
+    col_tit, col_log = st.columns()
     with col_tit:
         st.title("Plano de Ação Estratégico 5W2H")
     with col_log:
