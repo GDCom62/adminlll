@@ -95,7 +95,7 @@ def gerar_pdf():
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
     elements = []
     styles = getSampleStyleSheet()
-    elements.append(Paragraph("PLANO DE AÇÃO ESTRATÉGICO 5W2H", styles['Title']))
+    elements.append(Paragraph("PLANO DE AÇÃO ADMINISTRATIVO", styles['Title']))
     elements.append(Spacer(1, 12))
 
     data = [["Ação (What)", "Quem", "Prazo", "Status", "Como (How)", "QUANDO (Det)"]]
