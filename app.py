@@ -10,7 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 
 # Configuração da página Streamlit
-st.set_page_config(page_title="Plano de Ação 5W2H", layout="wide")
+st.set_page_config(page_title="Plano de Ação", layout="wide")
 
 # CONFIGURAÇÃO DO LOGIN FIXO (Altere aqui se quiser)
 USUARIO_FIXO = "admin"
