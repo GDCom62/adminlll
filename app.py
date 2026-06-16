@@ -12,11 +12,11 @@ from reportlab.lib import colors
 # Configuração da página Streamlit
 st.set_page_config(page_title="Plano de Ação", layout="wide")
 
-# CONFIGURAÇÃO DO LOGIN FIXO (Altere aqui se quiser)
+# CONFIGURAÇÃO DO LOGIN FIXO (Suas diretrizes mantidas)
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# Conexão segura usando st.secrets (usada apenas para os dados do 5W2H)
+# Conexão segura usando st.secrets
 def get_db_connection():
     return mysql.connector.connect(
         host=st.secrets["mysql"]["host"],
@@ -55,21 +55,20 @@ def gerar_pdf(acoes):
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 
-# --- TELA DE LOGIN (VALIDAÇÃO FIXA DIRETO NO CÓDIGO) ---
+# --- TELA DE LOGIN ---
 if not st.session_state['logado']:
     st.title("Login")
     usuario = st.text_input("Usuário")
     senha = st.text_input("Senha", type="password")
     
     if st.button("Entrar"):
-        # Validação direta sem consultar a tabela de Credenciais do banco
         if usuario == USUARIO_FIXO and senha == SENHA_FIXA:
             st.session_state['logado'] = True
             st.rerun()
         else:
             st.error("Usuário ou senha incorretos.")
 
-# --- PAINEL PRINCIPAL (ACESSA O BANCO APENAS PARA DADOS) ---
+# --- PAINEL PRINCIPAL ---
 else:
     col_tit, col_log = st.columns([4, 1])
     with col_tit:
@@ -79,7 +78,8 @@ else:
             st.session_state['logado'] = False
             st.rerun()
 
-    # Buscar dados do banco
+    # Buscar dados do banco de forma 100% silenciosa
+    acoes, usuarios = [], []
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -90,10 +90,9 @@ else:
         cursor.execute("SELECT * FROM Usuarios")
         usuarios = cursor.fetchall()
         conn.close()
-    except Exception as e:
-        st.error(f"Erro ao buscar dados do banco de dados: {e}")
-        st.info("💡 Lembre-se de configurar o [mysql] em Settings > Secrets do Streamlit Cloud.")
-        acoes, usuarios = [], []
+    except Exception:
+        # Erros técnicos ocultados da tela para manter o design limpo
+        pass
 
     # Botão para baixar PDF
     if acoes:
@@ -116,7 +115,7 @@ else:
         onde = st.text_input("Onde")
         
         dict_usuarios = {u['nome']: u['id_usuario'] for u in usuarios}
-        nome_resp = st.selectbox("Responsável (Quem) *", list(dict_usuarios.keys())) if dict_usuarios else st.selectbox("Responsável", ["Nenhum cadastrado"])
+        nome_resp = st.selectbox("Responsável (Quem) *", list(dict_usuarios.keys())) if dict_usuarios else st.selectbox("Responsável", ["Nenhum usuário localizado no banco"])
         
         prazo = st.date_input("Prazo *", value=datetime.now().date())
         como = st.text_input("Como")
@@ -129,7 +128,7 @@ else:
             if not descricao:
                 st.error("A descrição (O que) é obrigatória.")
             elif not dict_usuarios:
-                st.error("Não é possível salvar ações sem usuários cadastrados no banco.")
+                st.error("Erro: Não há conexão ativa com o banco de dados para salvar novas ações.")
             else:
                 id_resp = dict_usuarios.get(nome_resp)
                 dados = (descricao, porque, onde, id_resp, prazo.strftime('%Y-%m-%d'), como, quando_detalhe, status)
@@ -147,8 +146,8 @@ else:
                     conn.close()
                     st.success("Ação salva com sucesso!")
                     st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao salvar: {e}")
+                except Exception:
+                    st.error("Não foi possível salvar os dados. Verifique a conexão com o banco.")
 
     st.write("---")
 
@@ -170,7 +169,7 @@ else:
                         conn.close()
                         st.success("Excluído!")
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao excluir: {e}")
+                    except Exception:
+                        st.error("Erro ao tentar excluir do banco de dados.")
     else:
-        st.info("Nenhuma ação cadastrada.")
+        st.info("Nenhum registro carregado (Aguardando conexão ativa com o banco de dados MySQL).")
