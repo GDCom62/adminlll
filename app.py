@@ -10,9 +10,13 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 
 # Configuração da página Streamlit
-st.set_page_config(page_title="Plano de Ação Administrativo", layout="wide")
+st.set_page_config(page_title="Plano de Ação 5W2H", layout="wide")
 
-# Conexão segura usando st.secrets
+# CONFIGURAÇÃO DO LOGIN FIXO (Altere aqui se quiser)
+USUARIO_FIXO = "admin"
+SENHA_FIXA = "123"
+
+# Conexão segura usando st.secrets (usada apenas para os dados do 5W2H)
 def get_db_connection():
     return mysql.connector.connect(
         host=st.secrets["mysql"]["host"],
@@ -35,7 +39,6 @@ def gerar_pdf(acoes):
     for a in acoes:
         data.append([a['descricao_acao'], a['nome'], str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
 
-    # Larguras corrigidas para evitar estouro de página
     t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -52,31 +55,25 @@ def gerar_pdf(acoes):
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 
-# --- TELA DE LOGIN ---
+# --- TELA DE LOGIN (VALIDAÇÃO FIXA DIRETO NO CÓDIGO) ---
 if not st.session_state['logado']:
-    st.title("Login ")
+    st.title("Login Sistema 5W2H")
     usuario = st.text_input("Usuário")
     senha = st.text_input("Senha", type="password")
     
     if st.button("Entrar"):
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM Credenciais WHERE usuario=%s AND senha=%s", (usuario, senha))
-            if cursor.fetchone():
-                st.session_state['logado'] = True
-                st.rerun()
-            else:
-                st.error("Usuário ou senha incorretos.")
-            conn.close()
-        except Exception as e:
-            st.error(f"Erro ao conectar no banco: {e}")
+        # Validação direta sem consultar a tabela de Credenciais do banco
+        if usuario == USUARIO_FIXO and senha == SENHA_FIXA:
+            st.session_state['logado'] = True
+            st.rerun()
+        else:
+            st.error("Usuário ou senha incorretos.")
 
-# --- PAINEL PRINCIPAL ---
+# --- PAINEL PRINCIPAL (ACESSA O BANCO APENAS PARA DADOS) ---
 else:
-    col_tit, col_log = st.columns()
+    col_tit, col_log = st.columns([4, 1])
     with col_tit:
-        st.title("Plano de Ação Administrativo")
+        st.title("Plano de Ação Estratégico 5W2H")
     with col_log:
         if st.button("Sair (Logout)", use_container_width=True):
             st.session_state['logado'] = False
@@ -94,7 +91,8 @@ else:
         usuarios = cursor.fetchall()
         conn.close()
     except Exception as e:
-        st.error(f"Erro ao buscar dados: {e}")
+        st.error(f"Erro ao buscar dados do banco de dados: {e}")
+        st.info("💡 Lembre-se de configurar o [mysql] em Settings > Secrets do Streamlit Cloud.")
         acoes, usuarios = [], []
 
     # Botão para baixar PDF
@@ -130,6 +128,8 @@ else:
         if submit:
             if not descricao:
                 st.error("A descrição (O que) é obrigatória.")
+            elif not dict_usuarios:
+                st.error("Não é possível salvar ações sem usuários cadastrados no banco.")
             else:
                 id_resp = dict_usuarios.get(nome_resp)
                 dados = (descricao, porque, onde, id_resp, prazo.strftime('%Y-%m-%d'), como, quando_detalhe, status)
