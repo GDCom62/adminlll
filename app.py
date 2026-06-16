@@ -10,7 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 
 # Configuração da página Streamlit
-st.set_page_config(page_title="Plano de Ação 5W2H", layout="wide")
+st.set_page_config(page_title="Plano de Ação Administrativo", layout="wide")
 
 # Conexão segura usando st.secrets
 def get_db_connection():
@@ -76,7 +76,7 @@ if not st.session_state['logado']:
 else:
     col_tit, col_log = st.columns()
     with col_tit:
-        st.title("Plano de Ação Estratégico 5W2H")
+        st.title("Plano de Ação Administrativo")
     with col_log:
         if st.button("Sair (Logout)", use_container_width=True):
             st.session_state['logado'] = False
