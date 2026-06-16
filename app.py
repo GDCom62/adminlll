@@ -57,7 +57,7 @@ if 'logado' not in st.session_state:
 
 # --- TELA DE LOGIN (VALIDAÇÃO FIXA DIRETO NO CÓDIGO) ---
 if not st.session_state['logado']:
-    st.title("Login Sistema 5W2H")
+    st.title("Login")
     usuario = st.text_input("Usuário")
     senha = st.text_input("Senha", type="password")
     
