@@ -28,13 +28,15 @@ def get_db_connection():
     )
 
 # Função para gerar PDF
-def gerar_pdf(acoes):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
-    elements = []
-    styles = getSampleStyleSheet()
-    elements.append(Paragraph("PLANO DE AÇÃO ADMINISTRATIVO", styles['Title']))
-    elements.append(Spacer(1, 12))
+def get_db_connection():
+    return mysql.connector.connect(
+        host="b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com",      # Termina em .clever-cloud.com
+        user="uaoxaabon9ifpx5x",                # Seu usuário correto
+        password="vDf6RJjOb2Bt16XX3YOg",     # Atenção a letras maiúsculas e minúsculas
+        database="b7dxmekynipigcv1sftu", # Geralmente é igual ao usuário ou começa com 'b'
+        port=3306
+    )
+
 
     data = [["Ação (What)", "Quem", "Prazo", "Status", "Como (How)", "QUANDO (Det)"]]
     for a in acoes:
