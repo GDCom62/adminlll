@@ -2,6 +2,7 @@ import streamlit as st
 import mysql.connector
 from datetime import datetime
 import io
+import pandas as pd
 
 # Bibliotecas para geração de PDF
 from reportlab.lib.pagesizes import landscape, A4
@@ -39,7 +40,6 @@ def gerar_pdf(acoes):
     for a in acoes:
         data.append([a['descricao_acao'], a['nome'], str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
 
-    # Larguras corrigidas e completadas para o ReportLab
     t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -71,10 +71,12 @@ if not st.session_state['logado']:
 
 # --- PAINEL PRINCIPAL ---
 else:
-    col_tit, col_log = st.columns()
+    # CORREÇÃO DO ERRO: Informando explicitamente o número de colunas (2)
+    col_tit, col_log = st.columns(2)
     with col_tit:
         st.title("Plano de Ação Lavo e Levo")
     with col_log:
+        st.write("<br>", unsafe_allow_html=True) # Alinha o botão verticalmente
         if st.button("Sair (Logout)", use_container_width=True):
             st.session_state['logado'] = False
             st.rerun()
@@ -89,7 +91,7 @@ else:
         cursor.execute("SELECT id_usuario, nome FROM Usuarios")
         usuarios = cursor.fetchall()
             
-        cursor.execute("SELECT A.*, U.nome FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
+        cursor.execute("SELECT A.id_acao, A.descricao_acao, A.porque, A.onde, A.prazo, A.como, A.quando_detalhe, A.status, U.nome FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
         acoes = cursor.fetchall()
             
         conn.close()
@@ -114,7 +116,7 @@ else:
     # Formulário para Salvar/Editar
     st.subheader("Nova Ação / Editar Ação")
     with st.form("form_acao", clear_on_submit=True):
-        st.info("💡 Para criar um novo item, deixe o ID da Ação vazio. Para editar, use apenas números puros (ex: 1, 2, 3).")
+        st.info("💡 Para criar um novo item, deixe o ID da Ação vazio. Para editar, digite o número do ID correspondente.")
         id_acao = st.text_input("ID da Ação (Somente números para editar)")
         descricao = st.text_input("O que (Ação) *")
         porque = st.text_input("Por que")
@@ -135,10 +137,9 @@ else:
         submit = st.form_submit_button("Salvar Ação")
         
         if submit:
-            # Validação para impedir que letras/traços no ID quebrem o banco de dados
             id_limpo = id_acao.strip()
             if id_limpo != "" and not id_limpo.isdigit():
-                st.error("Erro: O ID da Ação precisa ser um número inteiro válido (ex: 1, 5, 12). Não use letras ou traços.")
+                st.error("Erro: O ID da Ação precisa ser um número inteiro válido (ex: 1, 5, 12).")
             elif not descricao:
                 st.error("A descrição (O que) é obrigatória.")
             elif not dict_usuarios:
@@ -167,25 +168,36 @@ else:
 
     st.write("---")
 
-    # Tabela de Visualização e Exclusão
+    # Tabela de Visualização e Gerenciamento Estruturada
     st.subheader("Ações Cadastradas")
     if acoes:
-        for a in acoes:
-            with st.expander(f"📌 {a['descricao_acao']} - Prazo: {a['prazo']} ({a['status']})"):
-                st.write(f"**Por que:** {a['porque']} | **Onde:** {a['onde']}")
-                st.write(f"**Quem:** {a['nome']} | **Como:** {a['como']} | **Detalhe:** {a['quando_detalhe']}")
-                st.write(f"**ID correto para usar na edição:** `{a['id_acao']}`")
-                
-                if st.button(f"❌ Excluir Ação #{a['id_acao']}", key=f"del_{a['id_acao']}"):
+        # Transforma os dados em uma tabela visual interativa
+        df = pd.DataFrame(acoes)
+        df.columns = ["ID", "O que (Ação)", "Por que", "Onde", "Prazo", "Como", "Quando Det.", "Status", "Quem"]
+        # Reorganiza a ordem das colunas para ficar mais intuitivo
+        df = df[["ID", "O que (Ação)", "Quem", "Prazo", "Status", "Por que", "Onde", "Como", "Quando Det."]]
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        st.write("<br>", unsafe_allow_html=True)
+        st.caption("⚙️ **Área de Exclusão de Itens**")
+        col_del_id, col_del_btn = st.columns([1, 4])
+        with col_del_id:
+            id_para_deletar = st.text_input("ID para remover", key="id_del_input", placeholder="Ex: 1")
+        with col_del_btn:
+            st.write("<br>", unsafe_allow_html=True)
+            if st.button("❌ Confirmar e Apagar Ação", type="secondary"):
+                if id_para_deletar.strip().isdigit():
                     try:
                         conn = get_db_connection()
                         cursor = conn.cursor()
-                        cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (a['id_acao'],))
+                        cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (int(id_para_deletar),))
                         conn.commit()
                         conn.close()
-                        st.success("Excluído!")
+                        st.success(f"Ação #{id_para_deletar} excluída com sucesso!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao tentar excluir: {e}")
+                else:
+                    st.warning("Digite um número de ID válido para poder excluir.")
     else:
         st.info("Nenhum registro carregado (Banco conectado, mas sem ações criadas).")
