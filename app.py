@@ -20,10 +20,10 @@ SENHA_FIXA = "123"
 # ATENÇÃO: Verifique com muita atenção os caracteres copiados aqui!
 def get_db_connection():
     return mysql.connector.connect(
-        host="COLE_AQUI_O_HOST_DA_CLEVER_CLOUD",
+        host="b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com",
         user="uaoxaabon9ifpx5x", # Seu usuário detectado pelo erro
-        password="COLE_AQUI_A_PASSWORD_DA_CLEVER_CLOUD",
-        database="COLE_AQUI_O_DATABASE_DA_CLEVER_CLOUD",
+        password="uaoxaabon9ifpx5x",
+        database="b7dxmekynipigcv1sftu",
         port=3306
     )
 
