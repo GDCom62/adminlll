@@ -58,16 +58,14 @@ if 'logado' not in st.session_state:
 
 # --- TELA DE LOGIN ---
 if not st.session_state['logado']:
-    # Layout para centralizar o Logo no Login
-    col_l1, col_l2, col_l3 = st.columns([1, 1, 1])
+    col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
         try:
             st.image("logo.png", use_container_width=True)
         except Exception:
             st.caption("📷 *[Insira o arquivo logo.png no seu GitHub para exibi-lo aqui]*")
     
-    # Caixa de Login centralizada por colunas
-    col_b1, col_b2, col_b3 = st.columns([1, 2, 1])
+    col_b1, col_b2, col_b3 = st.columns(3)
     with col_b2:
         st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
         usuario = st.text_input("Usuário")
@@ -82,8 +80,7 @@ if not st.session_state['logado']:
 
 # --- PAINEL PRINCIPAL ---
 else:
-    # Cabeçalho com duas colunas
-    col_tit, col_log = st.columns([3, 1])
+    col_tit, col_log = st.columns(2)
     with col_tit:
         st.title("Plano de Ação Lavo e Levo")
     with col_log:
@@ -116,18 +113,15 @@ else:
     st.write("---")
     st.subheader("📊 Gráfico de Monitoramento de Status")
     
-    # Processa os status existentes para o gráfico
     status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
     if acoes:
         for a in acoes:
             if a['status'] in status_contagem:
                 status_contagem[a['status']] += 1
     
-    # Cria o DataFrame para o gráfico do Streamlit
     df_grafico = pd.DataFrame(list(status_contagem.items()), columns=["Status", "Quantidade"])
     st.bar_chart(df_grafico, x="Status", y="Quantidade", color="#1f77b4")
 
-    # Botão para baixar PDF se houver ações
     if acoes:
         pdf_data = gerar_pdf(acoes)
         st.download_button(
@@ -182,8 +176,7 @@ else:
                         sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
                         cursor.execute(sql, dados + (int(id_limpo),))
                     else:
-                        sql = "INSERT INTO Acoes (descricao_acao, because, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-                        sql = sql.replace("because", "porque") # Correção gramatical automática
+                        sql = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
                         cursor.execute(sql, dados)
                         
                     conn.commit()
@@ -202,30 +195,26 @@ else:
         df.columns = ["ID", "O que (Ação)", "Por que", "Onde", "Prazo", "Como", "Quando Det.", "Status", "Quem"]
         df = df[["ID", "O que (Ação)", "Quem", "Prazo", "Status", "Por que", "Onde", "Como", "Quando Det."]]
         
-        # Função interna que pinta as linhas atrasadas/vencidas de vermelho
         hoje_atual = datetime.now().date()
         def aplicar_alerta_vencido(row):
             try:
-                # Converte o prazo para data se necessário
                 data_prazo = row["Prazo"]
                 if isinstance(data_prazo, str):
                     data_prazo = datetime.strptime(data_prazo, "%Y-%m-%d").date()
                 
-                # Se passou da data e não está concluído, colore toda a linha de vermelho transparente
                 if data_prazo < hoje_atual and row["Status"] != "Concluído":
                     return ['background-color: #ffcccc; color: #990000; font-weight: bold'] * len(row)
             except Exception:
                 pass
             return [''] * len(row)
 
-        # Renderiza a tabela aplicando o estilo condicional
         df_estilizado = df.style.apply(aplicar_alerta_vencido, axis=1)
         st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
         
-        # Gerenciamento de Exclusão
+        # Gerenciamento de Exclusão Corrigido
         st.write("<br>", unsafe_allow_html=True)
         st.caption("⚙️ **Área de Exclusão de Itens**")
-        col_del_id, col_del_btn = st.columns([3, 1])
+        col_del_id, col_del_btn = st.columns(2)
         with col_del_id:
             id_para_deletar = st.text_input("ID para remover", key="id_del_input", placeholder="Ex: 1")
         with col_del_btn:
@@ -238,3 +227,24 @@ else:
                         cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (int(id_para_deletar),))
                         conn.commit()
                         conn.close()
+                        st.success(f"Ação #{id_para_deletar} excluída com sucesso!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao tentar excluir: {e}")
+                else:
+                    st.warning("Digite um número de ID válido para poder excluir.")
+    else:
+        st.info("Nenhum registro carregado (Banco conectado, mas sem ações criadas).")
+
+    # --- LOGO FIXED NO CANTO INFERIOR DIREITO ---
+    st.markdown(
+        """
+        <style>
+        .footer-logo {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            width: 70px;
+            z-index: 999;
+            opacity: 0.7;
+        }
