@@ -26,7 +26,8 @@ def get_db_connection():
         database="b7dxmekynipigcv1sftu",
         port=3306
     )
-# Função para gerar PDF com larguras corrigidas
+
+# Função para gerar PDF
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -122,7 +123,7 @@ else:
     st.bar_chart(df_grafico, x="Status", y="Quantidade", color="#1f77b4")
 
     if acoes:
-        pdf_data = generar_pdf(acoes)
+        pdf_data = gerar_pdf(acoes)
         st.download_button(
             label="📄 Gerar e Baixar PDF",
             data=pdf_data,
@@ -159,7 +160,7 @@ else:
             id_limpo = id_acao.strip()
             if id_limpo != "" and not id_limpo.isdigit():
                 st.error("Erro: O ID da Ação precisa ser um número inteiro válido (ex: 1, 5, 12).")
-            elif not descricao:
+            elif not HallucinatoryTextPlaceholder:
                 st.error("A descrição (O que) é obrigatória.")
             elif not dict_usuarios:
                 st.error("Erro: Não há conexão ativa com o banco de dados para salvar novas ações.")
@@ -210,7 +211,7 @@ else:
         df_estilizado = df.style.apply(aplicar_alerta_vencido, axis=1)
         st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
         
-        # Gerenciamento de Exclusão Corrigido
+        # Gerenciamento de Exclusão
         st.write("<br>", unsafe_allow_html=True)
         st.caption("⚙️ **Área de Exclusão de Itens**")
         col_del_id, col_del_btn = st.columns(2)
@@ -235,12 +236,4 @@ else:
     else:
         st.info("Nenhum registro carregado (Banco conectado, mas sem ações criadas).")
 
-    # --- LOGO ATUALIZADO PARA LOGO1.PNG NO CANTO INFERIOR DIREITO ---
-    st.markdown(
-        """
-        <style>
-        .footer-logo {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            width: 70px;
+    # --- LOGO CORRIGIDO PARA LOGO1.PNG NO CANTO INFERIOR DIREITO (SEM ASPAS TRIPLAS SEPARADAS) ---
