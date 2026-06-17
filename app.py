@@ -26,8 +26,7 @@ def get_db_connection():
         database="b7dxmekynipigcv1sftu",
         port=3306
     )
-
-# Função para gerar PDF
+# Função para gerar PDF com larguras corrigidas
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -123,7 +122,7 @@ else:
     st.bar_chart(df_grafico, x="Status", y="Quantidade", color="#1f77b4")
 
     if acoes:
-        pdf_data = gerar_pdf(acoes)
+        pdf_data = generar_pdf(acoes)
         st.download_button(
             label="📄 Gerar e Baixar PDF",
             data=pdf_data,
@@ -236,7 +235,7 @@ else:
     else:
         st.info("Nenhum registro carregado (Banco conectado, mas sem ações criadas).")
 
-    # --- LOGO FIXED NO CANTO INFERIOR DIREITO ---
+    # --- LOGO ATUALIZADO PARA LOGO1.PNG NO CANTO INFERIOR DIREITO ---
     st.markdown(
         """
         <style>
@@ -245,6 +244,3 @@ else:
             bottom: 10px;
             right: 10px;
             width: 70px;
-            z-index: 999;
-            opacity: 0.7;
-        }
