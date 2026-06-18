@@ -29,7 +29,7 @@ def get_db_connection():
         port=3306
     )
 
-# Função para gerar PDF com larguras corrigidas na linha 45
+# Função para gerar PDF
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -42,7 +42,6 @@ def gerar_pdf(acoes):
     for a in acoes:
         data.append([a['descricao_acao'], a['nome'], str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
 
-    # CORREÇÃO DO ERRO: Adicionado os valores exatos de largura das colunas
     t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -157,12 +156,12 @@ else:
             "status": item['status'],
             "responsavel_nome": item['nome']
         }
-        st.warning(f"📝 Você está editando a Ação ID #{valores_padrao['id']}. Altere os campos e clique em Salvar.")
+        st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
 
     # Formulário para Salvar/Editar
     st.subheader("Nova Ação / Editar Ação")
     with st.form("form_acao", clear_on_submit=False):
-        id_acao = st.text_input("ID da Ação (Preenchido automaticamente ao editar)", value=valores_padrao["id"], disabled=True)
+        id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
         descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
         porque = st.text_input("Por que", value=valores_padrao["porque"])
         onde = st.text_input("Onde", value=valores_padrao["onde"])
@@ -178,7 +177,7 @@ else:
         if valores_padrao["responsavel_nome"] in lista_nomes_usuarios:
             index_resp = lista_nomes_usuarios.index(valores_padrao["responsavel_nome"])
             
-        nome_resp = st.selectbox("Responsável (Quem) *", lista_nomes_usuarios, index=index_resp) if lista_nomes_usuarios else st.selectbox("Responsável", ["Nenhum usuário localizado no banco"])
+        nome_resp = st.selectbox("Responsável (Quem) *", lista_nomes_usuarios, index=index_resp) if lista_nomes_usuarios else st.selectbox("Responsável", ["Nenhum usuário no banco"])
         
         prazo_val = datetime.now().date()
         if st.session_state['edit_item'] and isinstance(item['prazo'], (str, datetime, datetime.date)):
@@ -244,7 +243,8 @@ else:
         
         hoje_atual = datetime.now().date()
         
+        # Estrutura simplificada e direta sem risco de IndentationError
         def aplicar_alerta_vencido(row):
-            try:
-                data_prazo = row["Prazo"]
-                if isinstance(data_prazo, str):
+            dt_pz = pd.to_datetime(row["Prazo"]).date() if isinstance(row["Prazo"], str) else row["Prazo"]
+            if dt_pz < hoje_atual and row["Status"] != "Concluído":
+                return ['background-color: #ffcccc; color: #990000; font-weight: bold'] * len(row)
