@@ -29,7 +29,7 @@ def get_db_connection():
         port=3306
     )
 
-# Função para gerar PDF
+# Função para gerar PDF com larguras corrigidas na linha 45
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -42,7 +42,8 @@ def gerar_pdf(acoes):
     for a in acoes:
         data.append([a['descricao_acao'], a['nome'], str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
 
-    t = Table(data, colWidths=)
+    # CORREÇÃO DO ERRO: Adicionado os valores exatos de largura das colunas
+    t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -247,5 +248,3 @@ else:
             try:
                 data_prazo = row["Prazo"]
                 if isinstance(data_prazo, str):
-                    data_prazo = datetime.strptime(data_prazo, "%Y-%m-%d").date()
-                if data_prazo < hoje_atual and row["Status"] != "Concluído":
