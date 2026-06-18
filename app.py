@@ -29,7 +29,7 @@ def get_db_connection():
         port=3306
     )
 
-# Função para gerar PDF
+# Função para gerar PDF corrigida de ponta a ponta
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -43,8 +43,8 @@ def gerar_pdf(acoes):
         nome_resp = a['nome'] if a['nome'] else "Não definido"
         data.append([a['descricao_acao'], nome_resp, str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
 
-    # DEFINIDO COLWIDTHS COM VALORES FIXOS REAIS
-    t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
+    # CORREÇÃO CRÍTICA: Valores de larguras inseridos para destravar a página
+    t = Table(data, colWidths=[130, 90, 70, 80, 150, 130])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -106,7 +106,6 @@ else:
         cursor.execute("SELECT id_usuario, nome FROM Usuarios")
         usuarios = cursor.fetchall()
             
-        # CORREÇÃO CHAVE: Mudado de JOIN para LEFT JOIN. Isso traz a ação mesmo se houver erro no ID do usuário!
         cursor.execute("SELECT A.id_acao, A.descricao_acao, A.porque, A.onde, A.prazo, A.como, A.quando_detalhe, A.status, U.nome FROM Acoes A LEFT JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
         acoes = cursor.fetchall()
             
@@ -243,3 +242,6 @@ else:
                 except Exception as e:
                     st.error(f"Erro interno do banco de dados ao salvar: {e}")
 
+    st.write("---")
+
+    # --- INTERFACE DE VISUALIZAÇÃO PURA ---
