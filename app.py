@@ -42,7 +42,7 @@ def gerar_pdf(acoes):
     for a in acoes:
         data.append([a['descricao_acao'], a['nome'], str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
 
-    t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
+    t = Table(data, colWidths=)
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -177,7 +177,7 @@ else:
         if valores_padrao["responsavel_nome"] in lista_nomes_usuarios:
             index_resp = lista_nomes_usuarios.index(valores_padrao["responsavel_nome"])
             
-        nome_resp = st.selectbox("Responsável (Quem) *", lista_nomes_usuarios, index=index_resp) if lista_nomes_usuarios else st.selectbox("Responsável", ["Nenhum usuário no banco"])
+        nome_resp = st.selectbox("Responsável (Quem) *", lista_nomes_usuarios, index=index_resp) if lista_nomes_usuarios else st.selectbox("Responsável", ["Nenhum usuário localizado no banco"])
         
         prazo_val = datetime.now().date()
         if st.session_state['edit_item'] and isinstance(item['prazo'], (str, datetime, datetime.date)):
@@ -194,11 +194,10 @@ else:
         index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
         status = st.selectbox("Status", lista_status, index=index_status)
         
-        col_btn_sub, col_btn_can = st.columns([1, 5])
+        col_btn_sub, col_btn_can = st.columns(2)
         with col_btn_sub:
             submit = st.form_submit_button("💾 Salvar")
         with col_btn_can:
-            # Botão para limpar a edição e voltar ao modo de "Nova Ação"
             if st.session_state['edit_item']:
                 if st.form_submit_button("❌ Cancelar Edição"):
                     st.session_state['edit_item'] = None
@@ -221,7 +220,7 @@ else:
                     if id_limpo != "":
                         sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
                         cursor.execute(sql, dados + (int(id_limpo),))
-                        st.session_state['edit_item'] = None # Limpa a memória após salvar
+                        st.session_state['edit_item'] = None
                     else:
                         sql = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
                         cursor.execute(sql, dados)
@@ -243,7 +242,10 @@ else:
         df = df[["ID", "O que (Ação)", "Quem", "Prazo", "Status", "Por que", "Onde", "Como", "Quando Det."]]
         
         hoje_atual = datetime.now().date()
+        
         def aplicar_alerta_vencido(row):
             try:
                 data_prazo = row["Prazo"]
                 if isinstance(data_prazo, str):
+                    data_prazo = datetime.strptime(data_prazo, "%Y-%m-%d").date()
+                if data_prazo < hoje_atual and row["Status"] != "Concluído":
