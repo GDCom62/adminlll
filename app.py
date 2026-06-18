@@ -29,7 +29,7 @@ def get_db_connection():
         port=3306
     )
 
-# Função para gerar PDF com larguras corrigidas na linha 44
+# Função para gerar PDF
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -42,7 +42,6 @@ def gerar_pdf(acoes):
     for a in acoes:
         data.append([a['descricao_acao'], a['nome'], str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
 
-    # LARGURAS PREENCHIDAS CORRETAMENTE PARA EVITAR TRAVAMENTOS
     t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -243,7 +242,8 @@ else:
 
     st.write("---")
 
-    # --- TABELA DE VISUALIZAÇÃO COM ALERTA ---
+    # --- NOVA INTERFACE DE VISUALIZAÇÃO PURA (MUDANÇA DA TABELA CONTRA TRAVAMENTOS) ---
     st.subheader("Ações Cadastradas")
     if acoes:
-        df = pd.DataFrame(acoes)
+        hoje_atual = datetime.now().date()
+        
