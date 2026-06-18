@@ -29,7 +29,7 @@ def get_db_connection():
         port=3306
     )
 
-# Função para gerar PDF
+# Função para gerar PDF corrigida definitivamente na linha 45
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -40,9 +40,10 @@ def gerar_pdf(acoes):
 
     data = [["Ação (What)", "Responsável", "Prazo", "Status", "Como (How)", "QUANDO (Det)"]]
     for a in acoes:
-        data.append([str(a), str(a), str(a), str(a), str(a), str(a)])
+        data.append([str(a[1]), str(a[4]), str(a[5]), str(a[8]), str(a[6]), str(a[7])])
 
-    t = Table(data, colWidths=)
+    # CORREÇÃO DO ERRO: Adicionado os valores numéricos exatos de largura das colunas do PDF
+    t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -116,7 +117,7 @@ else:
     status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
     if acoes:
         for a in acoes:
-            status_atual = str(a)
+            status_atual = str(a[8])
             if status_atual in status_contagem:
                 status_contagem[status_atual] += 1
     
@@ -143,14 +144,14 @@ else:
     if st.session_state['edit_item']:
         item = st.session_state['edit_item']
         valores_padrao = {
-            "id": str(item),
-            "descricao": str(item),
-            "porque": str(item) if item else "",
-            "onde": str(item) if item else "",
-            "id_responsavel": str(item),
-            "como": str(item) if item else "",
-            "quando_detalhe": str(item) if item else "",
-            "status": str(item)
+            "id": str(item[0]),
+            "descricao": str(item[1]),
+            "porque": str(item[2]) if item[2] else "",
+            "onde": str(item[3]) if item[3] else "",
+            "id_responsavel": str(item[4]),
+            "como": str(item[6]) if item[6] else "",
+            "quando_detalhe": str(item[7]) if item[7] else "",
+            "status": str(item[8])
         }
         st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
 
@@ -167,7 +168,7 @@ else:
         prazo_val = datetime.now().date()
         if st.session_state['edit_item'] and item:
             try:
-                prazo_val = datetime.strptime(str(item), "%Y-%m-%d").date()
+                prazo_val = datetime.strptime(str(item[5]), "%Y-%m-%d").date()
             except Exception:
                 pass
                 
@@ -221,25 +222,22 @@ else:
 
     st.write("---")
 
-    # --- LISTAGEM CORRIGIDA SEM ASPAS TRIPLAS (PREVINE TRAVAMENTOS) ---
+    # --- LISTAGEM PURA PARSEADA VIA STRING CORRIGIDA ---
     st.subheader("Ações Cadastradas")
     if acoes:
         hoje_atual = datetime.now().date()
         for a in acoes:
             try:
-                dt_pz = datetime.strptime(str(a), "%Y-%m-%d").date()
+                dt_pz = datetime.strptime(str(a[5]), "%Y-%m-%d").date()
             except Exception:
                 dt_pz = hoje_atual
                 
-            esta_atrasado = dt_pz < hoje_atual and str(a) != "Concluído"
+            esta_atrasado = dt_pz < hoje_atual and str(a[8]) != "Concluído"
             
-            # Formatação visual limpa usando aspas simples comuns
             cor_fundo = "#fff2f2" if esta_atrasado else "#f9f9f9"
             cor_borda = "#ff4d4d" if esta_atrasado else "#ddd"
-            texto_status = f"🚨 {a} (ATRASADO)" if esta_atrasado else f"📌 {a}"
+            texto_status = f"🚨 {str(a[8])} (ATRASADO)" if esta_atrasado else f"📌 {str(a[8])}"
             
             with st.container():
-                # CORREÇÃO CRÍTICA: HTML concatenado em strings simples, sem aspas triplas f""" que geram f-string error
                 html_card = "<div style='border:1px solid " + cor_borda + "; background-color:" + cor_fundo + "; padding:15px; border-radius:8px; margin-bottom:12px;'>"
-                html_card += "<h4>ID #" + str(a) + " - " + str(a) + "</h4>"
-                html_card += "<b>ID Responsável:</b> " + str(a) + " | <b>Prazo:</b> " + str(a) + " | <b>Status:</b> " + texto_status + "<br>"
+                html_card += "<h4>ID #" + str(a[0]) + " - " + str(a[1]) + "</h4>"
