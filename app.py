@@ -22,9 +22,9 @@ SENHA_FIXA = "123"
 # CONEXÃO DIRETA COM A CLEVER CLOUD
 def get_db_connection():
     return mysql.connector.connect(
-        host="COLE_AQUI_O_HOST_DA_CLEVER_CLOUD",
+        host="b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com",
         user="uaoxaabon9ifpx5x",
-        password="SUA_SENHA_COMPLETA_AQUI",
+        password="vDf6RJjOb2Bt16XX3YOg",
         database="b7dxmekynipigcv1sftu",
         port=3306
     )
