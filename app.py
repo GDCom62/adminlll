@@ -29,7 +29,7 @@ def get_db_connection():
         port=3306
     )
 
-# Função para gerar PDF corrigida de ponta a ponta
+# Função para gerar PDF
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -38,13 +38,11 @@ def gerar_pdf(acoes):
     elements.append(Paragraph("PLANO DE AÇÃO ADMINISTRATIVO", styles['Title']))
     elements.append(Spacer(1, 12))
 
-    data = [["Ação (What)", "Quem", "Prazo", "Status", "Como (How)", "QUANDO (Det)"]]
+    data = [["Ação (What)", "Responsável", "Prazo", "Status", "Como (How)", "QUANDO (Det)"]]
     for a in acoes:
-        nome_resp = a['nome'] if a['nome'] else "Não definido"
-        data.append([a['descricao_acao'], nome_resp, str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
+        data.append([a['descricao_acao'], str(a['id_responsavel']), str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
 
-    # CORREÇÃO CRÍTICA: Valores de larguras inseridos para destravar a página
-    t = Table(data, colWidths=[130, 90, 70, 80, 150, 130])
+    t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -96,17 +94,15 @@ else:
             st.session_state['edit_item'] = None
             st.rerun()
 
-    # Buscar dados do banco
-    acoes, usuarios = [], []
+    # Buscar dados do banco sem travar em JOINS cruzados
+    acoes = []
     erro_banco = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        cursor.execute("SELECT id_usuario, nome FROM Usuarios")
-        usuarios = cursor.fetchall()
-            
-        cursor.execute("SELECT A.id_acao, A.descricao_acao, A.porque, A.onde, A.prazo, A.como, A.quando_detalhe, A.status, U.nome FROM Acoes A LEFT JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
+        # Leitura limpa e direta da tabela de ações
+        cursor.execute("SELECT * FROM Acoes ORDER BY prazo ASC")
         acoes = cursor.fetchall()
             
         conn.close()
@@ -143,7 +139,7 @@ else:
     # --- CONFIGURAÇÃO DE VALORES PADRÃO SE ESTIVER EDITANDO ---
     valores_padrao = {
         "id": "", "descricao": "", "porque": "", "onde": "", 
-        "como": "", "quando_detalhe": "", "status": "Não Iniciado", "responsavel_nome": ""
+        "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1"
     }
     
     if st.session_state['edit_item']:
@@ -156,7 +152,7 @@ else:
             "como": item['como'] if item['como'] else "",
             "quando_detalhe": item['quando_detalhe'] if item['quando_detalhe'] else "",
             "status": item['status'],
-            "responsavel_nome": item['nome'] if item['nome'] else ""
+            "id_responsavel": str(item['id_responsavel'])
         }
         st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
 
@@ -168,18 +164,8 @@ else:
         porque = st.text_input("Por que", value=valores_padrao["porque"])
         onde = st.text_input("Onde", value=valores_padrao["onde"])
         
-        dict_usuarios = {}
-        lista_nomes_usuarios = []
-        if usuarios:
-            for u in usuarios:
-                dict_usuarios[u['nome']] = u['id_usuario']
-                lista_nomes_usuarios.append(u['nome'])
-        
-        index_resp = 0
-        if valores_padrao["responsavel_nome"] in lista_nomes_usuarios:
-            index_resp = lista_nomes_usuarios.index(valores_padrao["responsavel_nome"])
-            
-        nome_resp = st.selectbox("Responsável (Quem) *", lista_nomes_usuarios, index=index_resp) if lista_nomes_usuarios else st.selectbox("Responsável", ["Nenhum usuário no banco"])
+        # Campo simplificado para evitar que trave por falta de tabela de usuários
+        responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"])
         
         prazo_val = datetime.now().date()
         if st.session_state['edit_item'] and isinstance(item['prazo'], (str, datetime, datetime.date)):
@@ -209,17 +195,16 @@ else:
             id_limpo = id_acao.strip()
             if not descricao.strip():
                 st.error("A descrição é obrigatória.")
-            elif not dict_usuarios:
-                st.error("Erro: Sem conexão ativa com o banco.")
             else:
-                id_resp = dict_usuarios.get(nome_resp)
-                
                 v_porque = porque.strip() if porque.strip() != "" else None
                 v_onde = onde.strip() if onde.strip() != "" else None
                 v_como = como.strip() if como.strip() != "" else None
                 v_quando = quando_detalhe.strip() if quando_detalhe.strip() != "" else None
                 
-                dados = (descricao.strip(), v_porque, v_onde, id_resp, prazo.strftime('%Y-%m-%d'), v_como, v_quando, status)
+                # Valida ID do responsável digitado
+                id_resp_final = int(responsavel_id_input.strip()) if responsavel_id_input.strip().isdigit() else 1
+                
+                dados = (descricao.strip(), v_porque, v_onde, id_resp_final, prazo.strftime('%Y-%m-%d'), v_como, v_quando, status)
                 
                 try:
                     conn = get_db_connection()
@@ -240,8 +225,21 @@ else:
                     st.success("Item processado e gravado com sucesso!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Erro interno do banco de dados ao salvar: {e}")
+                    st.error(f"Erro interno ao salvar: {e}")
 
     st.write("---")
 
-    # --- INTERFACE DE VISUALIZAÇÃO PURA ---
+    # --- LISTAGEM PURA E GARANTIDA SEM DEPENDÊNCIAS DE SESSÃO OU OUTRAS TABELAS ---
+    st.subheader("Ações Cadastradas")
+    if acoes:
+        hoje_atual = datetime.now().date()
+        
+        for a in acoes:
+            dt_pz = pd.to_datetime(a["prazo"]).date() if isinstance(a["prazo"], str) else a["prazo"]
+            esta_atrasado = dt_pz < hoje_atual and a["status"] != "Concluído"
+            
+            if esta_atrasado:
+                borda_estilo = "border: 2px solid #ff4d4d; background-color: #fff2f2; padding: 15px; border-radius: 8px; margin-bottom: 12px; color: #990000;"
+                label_status = f"🚨 {a['status']} (ATRASADO)"
+            else:
+                borda_estilo = "border: 1px solid #ddd; background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 12px;"
