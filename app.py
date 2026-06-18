@@ -29,7 +29,7 @@ def get_db_connection():
         port=3306
     )
 
-# Função para gerar PDF com larguras corrigidas de forma definitiva
+# Função para gerar PDF
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -100,11 +100,8 @@ else:
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # MUDANÇA CRÍTICA: Convertendo a data diretamente para texto (YYYY-MM-DD) via banco para evitar travas no Streamlit
         cursor.execute("SELECT id_acao, descricao_acao, porque, onde, id_responsavel, DATE_FORMAT(prazo, '%Y-%m-%d'), como, quando_detalhe, status FROM Acoes ORDER BY prazo ASC")
         acoes = cursor.fetchall()
-            
         conn.close()
     except Exception as e:
         erro_banco = str(e)
@@ -150,10 +147,10 @@ else:
             "descricao": str(item[1]),
             "porque": str(item[2]) if item[2] else "",
             "onde": str(item[3]) if item[3] else "",
+            "id_responsavel": str(item[4]),
             "como": str(item[6]) if item[6] else "",
             "quando_detalhe": str(item[7]) if item[7] else "",
-            "status": str(item[8]),
-            "id_responsavel": str(item[4])
+            "status": str(item[8])
         }
         st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
 
@@ -202,13 +199,11 @@ else:
                 v_quando = quando_detalhe.strip() if quando_detalhe.strip() != "" else None
                 
                 id_resp_final = int(responsavel_id_input.strip()) if responsavel_id_input.strip().isdigit() else 1
-                
                 dados = (descricao.strip(), v_porque, v_onde, id_resp_final, prazo.strftime('%Y-%m-%d'), v_como, v_quando, status)
                 
                 try:
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    
                     if id_limpo != "":
                         sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
                         cursor.execute(sql, dados + (int(id_limpo),))
@@ -216,24 +211,21 @@ else:
                     else:
                         sql = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
                         cursor.execute(sql, dados)
-                        
                     conn.commit()
                     cursor.close()
                     conn.close()
-                    st.success("Item processado e gravado com sucesso!")
+                    st.success("Item gravado com sucesso!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro interno ao salvar: {e}")
 
     st.write("---")
 
-    # --- LISTAGEM PURA PARSEADA VIA STRING ---
+    # --- LISTAGEM PURA PARSEADA VIA STRING CORRIGIDA ---
     st.subheader("Ações Cadastradas")
     if acoes:
         hoje_atual = datetime.now().date()
-        
         for a in acoes:
-            # 0=id, 1=desc, 2=porque, 3=onde, 4=id_resp, 5=prazo(string), 6=como, 7=quando, 8=status
             try:
                 dt_pz = datetime.strptime(str(a[5]), "%Y-%m-%d").date()
             except Exception:
@@ -241,7 +233,12 @@ else:
                 
             esta_atrasado = dt_pz < hoje_atual and str(a[8]) != "Concluído"
             
-            if esta_atrasado:
-                borda_estilo = "border: 2px solid #ff4d4d; background-color: #fff2f2; padding: 15px; border-radius: 8px; margin-bottom: 12px; color: #990000;"
-                label_status = f"🚨 {a[8]} (ATRASADO)"
-            else:
+            # Ajuste de bordas dinâmicas em linha única para evitar erros de else
+            borda_estilo = "border: 2px solid #ff4d4d; background-color: #fff2f2; padding: 15px; border-radius: 8px; margin-bottom: 12px; color: #990000;" if esta_atrasado else "border: 1px solid #ddd; background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 12px;"
+            label_status = f"🚨 {a[8]} (ATRASADO)" if esta_atrasado else f"📌 {a[8]}"
+                
+            with st.container():
+                st.markdown(f"""
+                <div style='{borda_estilo}'>
+                    <h4>ID #{a[0]} - {a[1]}</h4>
+                    <b>ID Responsável:</b> {a[4]} | <b>Prazo:</b> {a[5]} | <b>Status:</b> {label_status}<br>
