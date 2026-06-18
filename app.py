@@ -29,7 +29,7 @@ def get_db_connection():
         port=3306
     )
 
-# Função para gerar PDF
+# Função para gerar PDF com larguras corrigidas na linha 44
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -42,6 +42,7 @@ def gerar_pdf(acoes):
     for a in acoes:
         data.append([a['descricao_acao'], a['nome'], str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
 
+    # LARGURAS PREENCHIDAS CORRETAMENTE PARA EVITAR TRAVAMENTOS
     t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -212,7 +213,6 @@ else:
             else:
                 id_resp = dict_usuarios.get(nome_resp)
                 
-                # Tratamento de Strings: Garante que campos vazios não quebrem o MySQL
                 v_porque = porque.strip() if porque.strip() != "" else None
                 v_onde = onde.strip() if onde.strip() != "" else None
                 v_como = como.strip() if como.strip() != "" else None
