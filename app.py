@@ -2,7 +2,6 @@ import streamlit as st
 import mysql.connector
 from datetime import datetime
 import io
-import pandas as pd
 
 # Bibliotecas para geração de PDF
 from reportlab.lib.pagesizes import landscape, A4
@@ -11,13 +10,13 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 
 # Configuração da página Streamlit
-st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
+st.set_page_config(page_title="Plano de Ação", layout="wide")
 
 # CONFIGURAÇÃO DO LOGIN FIXO
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO DIRETA COM A CLEVER CLOUD
+# CONEXÃO DIRETA COM A CLEVER CLOUD (Preencha aqui com os dados reais)
 def get_db_connection():
     return mysql.connector.connect(
         host="b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com",
@@ -58,76 +57,65 @@ if 'logado' not in st.session_state:
 
 # --- TELA DE LOGIN ---
 if not st.session_state['logado']:
-    col_l1, col_l2, col_l3 = st.columns(3)
-    with col_l2:
-        try:
-            st.image("logo.png", use_container_width=True)
-        except Exception:
-            st.caption("📷 *[Insira o arquivo logo.png no seu GitHub para exibi-lo aqui]*")
+    st.title("Login")
+    usuario = st.text_input("Usuário")
+    senha = st.text_input("Senha", type="password")
     
-    col_b1, col_b2, col_b3 = st.columns(3)
-    with col_b2:
-        st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
-        usuario = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
-        
-        if st.button("Entrar", use_container_width=True):
-            if usuario == USUARIO_FIXO and senha == SENHA_FIXA:
-                st.session_state['logado'] = True
-                st.rerun()
-            else:
-                st.error("Usuário ou senha incorretos.")
+    if st.button("Entrar"):
+        if usuario == USUARIO_FIXO and senha == SENHA_FIXA:
+            st.session_state['logado'] = True
+            st.rerun()
+        else:
+            st.error("Usuário ou senha incorretos.")
 
 # --- PAINEL PRINCIPAL ---
 else:
-    col_tit, col_log = st.columns(2)
+    col_tit, col_log = st.columns([4, 1])
     with col_tit:
         st.title("Plano de Ação Lavo e Levo")
     with col_log:
-        st.write("<br>", unsafe_allow_html=True)
         if st.button("Sair (Logout)", use_container_width=True):
             st.session_state['logado'] = False
             st.rerun()
 
-    # Buscar dados do banco
+    # Buscar dados do banco de forma resiliente (Testa letras maiúsculas e minúsculas)
     acoes, usuarios = [], []
     erro_banco = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        cursor.execute("SELECT id_usuario, nome FROM Usuarios")
-        usuarios = cursor.fetchall()
+        # Tenta buscar os usuários (testando minúsculo se falhar)
+        try:
+            cursor.execute("SELECT * FROM Usuarios")
+            usuarios = cursor.fetchall()
+        except Exception:
+            cursor.execute("SELECT * FROM usuarios")
+            usuarios = cursor.fetchall()
             
-        cursor.execute("SELECT A.id_acao, A.descricao_acao, A.porque, A.onde, A.prazo, A.como, A.quando_detalhe, A.status, U.nome FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
-        acoes = cursor.fetchall()
+        # Tenta buscar as ações
+        try:
+            cursor.execute("SELECT A.*, U.nome FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
+            acoes = cursor.fetchall()
+        except Exception:
+            cursor.execute("SELECT a.*, u.nome FROM acoes a JOIN usuarios u ON a.id_responsavel = u.id_usuario ORDER BY a.prazo ASC")
+            acoes = cursor.fetchall()
             
         conn.close()
     except Exception as e:
         erro_banco = str(e)
 
+    # Exibe o erro real de conexão se houver, ajudando a descobrir o problema
     if erro_banco:
         st.error(f"Erro de conexão com a Clever Cloud: {erro_banco}")
 
-    # --- INDICADORES GRÁFICOS ---
-    st.write("---")
-    st.subheader("📊 Gráfico de Monitoramento de Status")
-    
-    status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
-    if acoes:
-        for a in acoes:
-            if a['status'] in status_contagem:
-                status_contagem[a['status']] += 1
-    
-    df_grafico = pd.DataFrame(list(status_contagem.items()), columns=["Status", "Quantidade"])
-    st.bar_chart(df_grafico, x="Status", y="Quantidade", color="#1f77b4")
-
+    # Botão para baixar PDF
     if acoes:
         pdf_data = gerar_pdf(acoes)
         st.download_button(
             label="📄 Gerar e Baixar PDF",
             data=pdf_data,
-            file_name="Plano_Lavo_Levo.pdf",
+            file_name="Plano_5W2H.pdf",
             mime="application/pdf"
         )
 
@@ -136,16 +124,17 @@ else:
     # Formulário para Salvar/Editar
     st.subheader("Nova Ação / Editar Ação")
     with st.form("form_acao", clear_on_submit=True):
-        st.info("💡 Para criar um novo item, deixe o ID vazio. Para editar, preencha com o número do ID desejado.")
-        id_acao = st.text_input("ID da Ação (Somente números para editar)")
+        id_acao = st.text_input("ID da Ação (Deixe vazio para criar nova, preencha para atualizar)")
         descricao = st.text_input("O que (Ação) *")
         porque = st.text_input("Por que")
         onde = st.text_input("Onde")
         
-        dict_usuarios = {}
-        if usuarios:
-            for u in usuarios:
-                dict_usuarios[u['nome']] = u['id_usuario']
+        dict_usuarios = {u['nome']: u['id_usuario'] for u in usuarios or u.get('nome') and [{'nome': u['nome'], 'id_usuario': u['id_usuario']} for u in usuarios]}
+        # Garante compatibilidade de chaves
+        if usuarios and 'nome' in usuarios[0]:
+            dict_usuarios = {u['nome']: u['id_usuario'] for u in usuarios}
+        elif usuarios and 'NOME' in usuarios[0]:
+            dict_usuarios = {u['NOME']: u['ID_USUARIO'] for u in usuarios}
             
         nome_resp = st.selectbox("Responsável (Quem) *", list(dict_usuarios.keys())) if dict_usuarios else st.selectbox("Responsável", ["Nenhum usuário localizado no banco"])
         
@@ -157,10 +146,7 @@ else:
         submit = st.form_submit_button("Salvar Ação")
         
         if submit:
-            id_limpo = id_acao.strip()
-            if id_limpo != "" and not id_limpo.isdigit():
-                st.error("Erro: O ID da Ação precisa ser um número inteiro válido (ex: 1, 5, 12).")
-            elif not HallucinatoryTextPlaceholder:
+            if not descricao:
                 st.error("A descrição (O que) é obrigatória.")
             elif not dict_usuarios:
                 st.error("Erro: Não há conexão ativa com o banco de dados para salvar novas ações.")
@@ -172,11 +158,24 @@ else:
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     
-                    if id_limpo != "":
-                        sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
-                        cursor.execute(sql, dados + (int(id_limpo),))
+                    # Detecta o nome correto da tabela para salvar
+                    tabela_acoes = "Acoes"
+                    try:
+                        cursor.execute("SELECT 1 FROM Acoes LIMIT 1")
+                    except Exception:
+                        tabela_acoes = "acoes"
+
+                    if id_acao and id_acao.strip() != "":
+                        if tabela_acoes == "Acoes":
+                            sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
+                        else:
+                            sql = "UPDATE acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
+                        cursor.execute(sql, dados + (id_acao,))
                     else:
-                        sql = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                        if tabela_acoes == "Acoes":
+                            sql = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                        else:
+                            sql = "INSERT INTO acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
                         cursor.execute(sql, dados)
                         
                     conn.commit()
@@ -188,52 +187,39 @@ else:
 
     st.write("---")
 
-    # --- TABELA DE VISUALIZAÇÃO COM ALERTA DE PRAZO VERMELHO ---
+    # Tabela de Visualização e Exclusão
     st.subheader("Ações Cadastradas")
     if acoes:
-        df = pd.DataFrame(acoes)
-        df.columns = ["ID", "O que (Ação)", "Por que", "Onde", "Prazo", "Como", "Quando Det.", "Status", "Quem"]
-        df = df[["ID", "O que (Ação)", "Quem", "Prazo", "Status", "Por que", "Onde", "Como", "Quando Det."]]
-        
-        hoje_atual = datetime.now().date()
-        def aplicar_alerta_vencido(row):
-            try:
-                data_prazo = row["Prazo"]
-                if isinstance(data_prazo, str):
-                    data_prazo = datetime.strptime(data_prazo, "%Y-%m-%d").date()
+        for a in acoes:
+            # Garante leitura independente de maiúsculas/minúsculas vindas do banco
+            d_acao = a.get('descricao_acao') or a.get('DESCRICAO_ACAO')
+            p_praz = a.get('prazo') or a.get('PRAZO')
+            s_stat = a.get('status') or a.get('STATUS')
+            p_porq = a.get('porque') or a.get('PORQUE')
+            o_onde = a.get('onde') or a.get('ONDE')
+            n_nome = a.get('nome') or a.get('NOME')
+            c_como = a.get('como') or a.get('COMO')
+            q_deta = a.get('quando_detalhe') or a.get('QUANDO_DETALHE')
+            i_id   = a.get('id_acao') or a.get('ID_ACAO')
+            
+            with st.expander(f"📌 {d_acao} - Prazo: {p_praz} ({s_stat})"):
+                st.write(f"**Por que:** {p_porq} | **Onde:** {o_onde}")
+                st.write(f"**Quem:** {n_nome} | **Como:** {c_como} | **Detalhe:** {q_deta}")
+                st.write(f"**ID da Ação para edição:** `{i_id}`")
                 
-                if data_prazo < hoje_atual and row["Status"] != "Concluído":
-                    return ['background-color: #ffcccc; color: #990000; font-weight: bold'] * len(row)
-            except Exception:
-                pass
-            return [''] * len(row)
-
-        df_estilizado = df.style.apply(aplicar_alerta_vencido, axis=1)
-        st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
-        
-        # Gerenciamento de Exclusão
-        st.write("<br>", unsafe_allow_html=True)
-        st.caption("⚙️ **Área de Exclusão de Itens**")
-        col_del_id, col_del_btn = st.columns(2)
-        with col_del_id:
-            id_para_deletar = st.text_input("ID para remover", key="id_del_input", placeholder="Ex: 1")
-        with col_del_btn:
-            st.write("<br>", unsafe_allow_html=True)
-            if st.button("❌ Confirmar e Apagar Ação", type="secondary", use_container_width=True):
-                if id_para_deletar.strip().isdigit():
+                if st.button(f"❌ Excluir Ação #{i_id}", key=f"del_{i_id}"):
                     try:
                         conn = get_db_connection()
                         cursor = conn.cursor()
-                        cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (int(id_para_deletar),))
+                        try:
+                            cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (i_id,))
+                        except Exception:
+                            cursor.execute("DELETE FROM acoes WHERE id_acao = %s", (i_id,))
                         conn.commit()
                         conn.close()
-                        st.success(f"Ação #{id_para_deletar} excluída com sucesso!")
+                        st.success("Excluído!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao tentar excluir: {e}")
-                else:
-                    st.warning("Digite um número de ID válido para poder excluir.")
     else:
-        st.info("Nenhum registro carregado (Banco conectado, mas sem ações criadas).")
-
-    # --- LOGO CORRIGIDO PARA LOGO1.PNG NO CANTO INFERIOR DIREITO (SEM ASPAS TRIPLAS SEPARADAS) ---
+        st.info("Nenhum registro carregado (Banco conectado, mas sem ações criadas).
