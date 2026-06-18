@@ -149,10 +149,10 @@ else:
         valores_padrao = {
             "id": str(item['id_acao']),
             "descricao": item['descricao_acao'],
-            "porque": item['porque'],
-            "onde": item['onde'],
-            "como": item['como'],
-            "quando_detalhe": item['quando_detalhe'],
+            "porque": item['porque'] if item['porque'] else "",
+            "onde": item['onde'] if item['onde'] else "",
+            "como": item['como'] if item['como'] else "",
+            "quando_detalhe": item['quando_detalhe'] if item['quando_detalhe'] else "",
             "status": item['status'],
             "responsavel_nome": item['nome']
         }
@@ -205,13 +205,20 @@ else:
         
         if submit:
             id_limpo = id_acao.strip()
-            if not descricao:
+            if not descricao.strip():
                 st.error("A descrição é obrigatória.")
             elif not dict_usuarios:
-                st.error("Erro: Sem conexão com o banco.")
+                st.error("Erro: Sem conexão ativa com o banco.")
             else:
                 id_resp = dict_usuarios.get(nome_resp)
-                dados = (descricao, porque, onde, id_resp, prazo.strftime('%Y-%m-%d'), como, quando_detalhe, status)
+                
+                # Tratamento de Strings: Garante que campos vazios não quebrem o MySQL
+                v_porque = porque.strip() if porque.strip() != "" else None
+                v_onde = onde.strip() if onde.strip() != "" else None
+                v_como = como.strip() if como.strip() != "" else None
+                v_quando = quando_detalhe.strip() if quando_detalhe.strip() != "" else None
+                
+                dados = (descricao.strip(), v_porque, v_onde, id_resp, prazo.strftime('%Y-%m-%d'), v_como, v_quando, status)
                 
                 try:
                     conn = get_db_connection()
@@ -226,11 +233,13 @@ else:
                         cursor.execute(sql, dados)
                         
                     conn.commit()
+                    cursor.close()
                     conn.close()
-                    st.success("Salvo com sucesso!")
+                    
+                    st.success("Item processado e gravado com sucesso!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Erro ao salvar: {e}")
+                    st.error(f"Erro interno do banco de dados ao salvar: {e}")
 
     st.write("---")
 
@@ -238,13 +247,3 @@ else:
     st.subheader("Ações Cadastradas")
     if acoes:
         df = pd.DataFrame(acoes)
-        df.columns = ["ID", "O que (Ação)", "Por que", "Onde", "Prazo", "Como", "Quando Det.", "Status", "Quem"]
-        df = df[["ID", "O que (Ação)", "Quem", "Prazo", "Status", "Por que", "Onde", "Como", "Quando Det."]]
-        
-        hoje_atual = datetime.now().date()
-        
-        # Estrutura simplificada e direta sem risco de IndentationError
-        def aplicar_alerta_vencido(row):
-            dt_pz = pd.to_datetime(row["Prazo"]).date() if isinstance(row["Prazo"], str) else row["Prazo"]
-            if dt_pz < hoje_atual and row["Status"] != "Concluído":
-                return ['background-color: #ffcccc; color: #990000; font-weight: bold'] * len(row)
