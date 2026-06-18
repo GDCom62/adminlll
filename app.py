@@ -40,8 +40,10 @@ def gerar_pdf(acoes):
 
     data = [["Ação (What)", "Quem", "Prazo", "Status", "Como (How)", "QUANDO (Det)"]]
     for a in acoes:
-        data.append([a['descricao_acao'], a['nome'], str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
+        nome_resp = a['nome'] if a['nome'] else "Não definido"
+        data.append([a['descricao_acao'], nome_resp, str(a['prazo']), a['status'], a['como'], a['quando_detalhe']])
 
+    # DEFINIDO COLWIDTHS COM VALORES FIXOS REAIS
     t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -104,7 +106,8 @@ else:
         cursor.execute("SELECT id_usuario, nome FROM Usuarios")
         usuarios = cursor.fetchall()
             
-        cursor.execute("SELECT A.id_acao, A.descricao_acao, A.porque, A.onde, A.prazo, A.como, A.quando_detalhe, A.status, U.nome FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
+        # CORREÇÃO CHAVE: Mudado de JOIN para LEFT JOIN. Isso traz a ação mesmo se houver erro no ID do usuário!
+        cursor.execute("SELECT A.id_acao, A.descricao_acao, A.porque, A.onde, A.prazo, A.como, A.quando_detalhe, A.status, U.nome FROM Acoes A LEFT JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
         acoes = cursor.fetchall()
             
         conn.close()
@@ -154,7 +157,7 @@ else:
             "como": item['como'] if item['como'] else "",
             "quando_detalhe": item['quando_detalhe'] if item['quando_detalhe'] else "",
             "status": item['status'],
-            "responsavel_nome": item['nome']
+            "responsavel_nome": item['nome'] if item['nome'] else ""
         }
         st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
 
@@ -240,10 +243,3 @@ else:
                 except Exception as e:
                     st.error(f"Erro interno do banco de dados ao salvar: {e}")
 
-    st.write("---")
-
-    # --- NOVA INTERFACE DE VISUALIZAÇÃO PURA (MUDANÇA DA TABELA CONTRA TRAVAMENTOS) ---
-    st.subheader("Ações Cadastradas")
-    if acoes:
-        hoje_atual = datetime.now().date()
-        
