@@ -54,9 +54,11 @@ def gerar_pdf(acoes):
     buffer.seek(0)
     return buffer.getvalue()
 
-# Inicializa o estado de login
+# Inicializa o estado de login e edição
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
+if 'edit_item' not in st.session_state:
+    st.session_state['edit_item'] = None
 
 # --- TELA DE LOGIN ---
 if not st.session_state['logado']:
@@ -89,6 +91,7 @@ else:
         st.write("<br>", unsafe_allow_html=True)
         if st.button("Sair (Logout)", use_container_width=True):
             st.session_state['logado'] = False
+            st.session_state['edit_item'] = None
             st.rerun()
 
     # Buscar dados do banco
@@ -135,34 +138,75 @@ else:
 
     st.write("---")
 
+    # --- CONFIGURAÇÃO DE VALORES PADRÃO SE ESTIVER EDITANDO ---
+    valores_padrao = {
+        "id": "", "descricao": "", "porque": "", "onde": "", 
+        "como": "", "quando_detalhe": "", "status": "Não Iniciado", "responsavel_nome": ""
+    }
+    
+    if st.session_state['edit_item']:
+        item = st.session_state['edit_item']
+        valores_padrao = {
+            "id": str(item['id_acao']),
+            "descricao": item['descricao_acao'],
+            "porque": item['porque'],
+            "onde": item['onde'],
+            "como": item['como'],
+            "quando_detalhe": item['quando_detalhe'],
+            "status": item['status'],
+            "responsavel_nome": item['nome']
+        }
+        st.warning(f"📝 Você está editando a Ação ID #{valores_padrao['id']}. Altere os campos e clique em Salvar.")
+
     # Formulário para Salvar/Editar
     st.subheader("Nova Ação / Editar Ação")
-    with st.form("form_acao", clear_on_submit=True):
-        st.info("💡 Para criar deixe o ID vazio. Para editar preencha o número do ID.")
-        id_acao = st.text_input("ID da Ação (Somente números)")
-        descricao = st.text_input("O que (Ação) *")
-        porque = st.text_input("Por que")
-        onde = st.text_input("Onde")
+    with st.form("form_acao", clear_on_submit=False):
+        id_acao = st.text_input("ID da Ação (Preenchido automaticamente ao editar)", value=valores_padrao["id"], disabled=True)
+        descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
+        porque = st.text_input("Por que", value=valores_padrao["porque"])
+        onde = st.text_input("Onde", value=valores_padrao["onde"])
         
         dict_usuarios = {}
+        lista_nomes_usuarios = []
         if usuarios:
             for u in usuarios:
                 dict_usuarios[u['nome']] = u['id_usuario']
+                lista_nomes_usuarios.append(u['nome'])
+        
+        index_resp = 0
+        if valores_padrao["responsavel_nome"] in lista_nomes_usuarios:
+            index_resp = lista_nomes_usuarios.index(valores_padrao["responsavel_nome"])
             
-        nome_resp = st.selectbox("Responsável (Quem) *", list(dict_usuarios.keys())) if dict_usuarios else st.selectbox("Responsável", ["Nenhum usuário no banco"])
+        nome_resp = st.selectbox("Responsável (Quem) *", lista_nomes_usuarios, index=index_resp) if lista_nomes_usuarios else st.selectbox("Responsável", ["Nenhum usuário no banco"])
         
-        prazo = st.date_input("Prazo *", value=datetime.now().date())
-        como = st.text_input("Como")
-        quando_detalhe = st.text_input("Quando (Detalhe)")
-        status = st.selectbox("Status", ["Não Iniciado", "Em Andamento", "Concluído"])
+        prazo_val = datetime.now().date()
+        if st.session_state['edit_item'] and isinstance(item['prazo'], (str, datetime, datetime.date)):
+            try:
+                prazo_val = pd.to_datetime(item['prazo']).date()
+            except Exception:
+                pass
+                
+        prazo = st.date_input("Prazo *", value=prazo_val)
+        como = st.text_input("Como", value=valores_padrao["como"])
+        quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"])
         
-        submit = st.form_submit_button("Salvar Ação")
+        lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
+        index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
+        status = st.selectbox("Status", lista_status, index=index_status)
+        
+        col_btn_sub, col_btn_can = st.columns([1, 5])
+        with col_btn_sub:
+            submit = st.form_submit_button("💾 Salvar")
+        with col_btn_can:
+            # Botão para limpar a edição e voltar ao modo de "Nova Ação"
+            if st.session_state['edit_item']:
+                if st.form_submit_button("❌ Cancelar Edição"):
+                    st.session_state['edit_item'] = None
+                    st.rerun()
         
         if submit:
             id_limpo = id_acao.strip()
-            if id_limpo != "" and not id_limpo.isdigit():
-                st.error("Erro: O ID precisa ser um número inteiro.")
-            elif not descricao:
+            if not descricao:
                 st.error("A descrição é obrigatória.")
             elif not dict_usuarios:
                 st.error("Erro: Sem conexão com o banco.")
@@ -177,6 +221,7 @@ else:
                     if id_limpo != "":
                         sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
                         cursor.execute(sql, dados + (int(id_limpo),))
+                        st.session_state['edit_item'] = None # Limpa a memória após salvar
                     else:
                         sql = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
                         cursor.execute(sql, dados)
@@ -202,51 +247,3 @@ else:
             try:
                 data_prazo = row["Prazo"]
                 if isinstance(data_prazo, str):
-                    data_prazo = datetime.strptime(data_prazo, "%Y-%m-%d").date()
-                if data_prazo < hoje_atual and row["Status"] != "Concluído":
-                    return ['background-color: #ffcccc; color: #990000; font-weight: bold'] * len(row)
-            except Exception:
-                pass
-            return [''] * len(row)
-
-        df_estilizado = df.style.apply(aplicar_alerta_vencido, axis=1)
-        st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
-        
-        # Gerenciamento de Exclusão
-        st.write("<br>", unsafe_allow_html=True)
-        st.caption("⚙️ **Área de Exclusão de Itens**")
-        col_del_id, col_del_btn = st.columns(2)
-        with col_del_id:
-            id_para_deletar = st.text_input("ID para remover", key="id_del_input", placeholder="Ex: 1")
-        with col_del_btn:
-            st.write("<br>", unsafe_allow_html=True)
-            if st.button("❌ Confirmar e Apagar Ação", type="secondary", use_container_width=True):
-                if id_para_deletar.strip().isdigit():
-                    try:
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (int(id_para_deletar),))
-                        conn.commit()
-                        conn.close()
-                        st.success(f"Ação #{id_para_deletar} excluída!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao excluir: {e}")
-                else:
-                    st.warning("Digite um ID válido.")
-    else:
-        st.info("Nenhum registro carregado no banco.")
-
-    # --- LOGO1.PNG NO CANTO INFERIOR DIREITO VIA BASE64 ---
-    src_final = "https://flaticon.com"
-    estilo_largura = "width:30px;"
-    
-    if os.path.exists("logo1.png"):
-        try:
-            with open("logo1.png", "rb") as image_file:
-                encoded_string = base64.b64encode(image_file.read()).decode()
-            src_final = f"data:image/png;base64,{encoded_string}"
-            estilo_largura = "width:80px;"
-        except Exception:
-            pass
-
