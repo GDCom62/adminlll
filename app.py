@@ -29,7 +29,7 @@ def get_db_connection():
         port=3306
     )
 
-# Função para gerar PDF com larguras corrigidas
+# Função para gerar PDF com larguras corrigidas de forma definitiva
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -40,7 +40,6 @@ def gerar_pdf(acoes):
 
     data = [["Ação (What)", "Responsável", "Prazo", "Status", "Como (How)", "QUANDO (Det)"]]
     for a in acoes:
-        # Posições fixas na leitura da tupla
         data.append([str(a[1]), str(a[4]), str(a[5]), str(a[8]), str(a[6]), str(a[7])])
 
     t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
@@ -95,14 +94,15 @@ else:
             st.session_state['edit_item'] = None
             st.rerun()
 
-    # Buscar dados do banco de forma posicional (Sem dictionary=True para evitar erros de maiúsculas)
+    # Buscar dados do banco
     acoes = []
     erro_banco = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() # Removeu a trava do dictionary
+        cursor = conn.cursor()
         
-        cursor.execute("SELECT id_acao, descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status FROM Acoes ORDER BY prazo ASC")
+        # MUDANÇA CRÍTICA: Convertendo a data diretamente para texto (YYYY-MM-DD) via banco para evitar travas no Streamlit
+        cursor.execute("SELECT id_acao, descricao_acao, porque, onde, id_responsavel, DATE_FORMAT(prazo, '%Y-%m-%d'), como, quando_detalhe, status FROM Acoes ORDER BY prazo ASC")
         acoes = cursor.fetchall()
             
         conn.close()
@@ -170,7 +170,7 @@ else:
         prazo_val = datetime.now().date()
         if st.session_state['edit_item'] and item[5]:
             try:
-                prazo_val = pd.to_datetime(item[5]).date()
+                prazo_val = datetime.strptime(str(item[5]), "%Y-%m-%d").date()
             except Exception:
                 pass
                 
@@ -220,7 +220,6 @@ else:
                     conn.commit()
                     cursor.close()
                     conn.close()
-                    
                     st.success("Item processado e gravado com sucesso!")
                     st.rerun()
                 except Exception as e:
@@ -228,19 +227,21 @@ else:
 
     st.write("---")
 
-    # --- LISTAGEM POSICIONAL DEFENSIVA CONTRA TRAVAMENTOS ---
+    # --- LISTAGEM PURA PARSEADA VIA STRING ---
     st.subheader("Ações Cadastradas")
     if acoes:
         hoje_atual = datetime.now().date()
         
         for a in acoes:
-            # Posições das colunas: 0=id, 1=desc, 2=porque, 3=onde, 4=id_resp, 5=prazo, 6=como, 7=quando, 8=status
-            dt_pz = pd.to_datetime(a[5]).date() if isinstance(a[5], str) else a[5]
+            # 0=id, 1=desc, 2=porque, 3=onde, 4=id_resp, 5=prazo(string), 6=como, 7=quando, 8=status
+            try:
+                dt_pz = datetime.strptime(str(a[5]), "%Y-%m-%d").date()
+            except Exception:
+                dt_pz = hoje_atual
+                
             esta_atrasado = dt_pz < hoje_atual and str(a[8]) != "Concluído"
             
             if esta_atrasado:
                 borda_estilo = "border: 2px solid #ff4d4d; background-color: #fff2f2; padding: 15px; border-radius: 8px; margin-bottom: 12px; color: #990000;"
                 label_status = f"🚨 {a[8]} (ATRASADO)"
             else:
-                borda_estilo = "border: 1px solid #ddd; background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 12px;"
-                label_status = f"📌 {a[8]}"
