@@ -18,13 +18,13 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO LOCAL E AUTOMÁTICA COM SQLITE
+# CONEXÃO LOCAL COM SQLITE
 def get_db_connection():
     conn = sqlite3.connect("banco_plano_acao.db")
     conn.row_factory = sqlite3.Row
     return conn
 
-# Criação automática da tabela caso ela não exista
+# Criação automática da tabela
 def inicializar_banco():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -44,17 +44,14 @@ def inicializar_banco():
     conn.commit()
     conn.close()
 
-# Inicializa o banco local
 inicializar_banco()
 
-# Função para salvar ou atualizar dados no Banco de Dados
+# Função para salvar no Banco
 def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
         if id_limpo and id_limpo.isdigit():
-            # Query de Edição (UPDATE)
             query = """UPDATE Acoes SET 
                        descricao_acao=?, porque=?, onde=?, id_responsavel=?, 
                        prazo=?, como=?, quando_detalhe=?, status=? 
@@ -62,13 +59,11 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
             valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, int(id_limpo))
             cursor.execute(query, valores)
         else:
-            # Query de Criação (INSERT)
             query = """INSERT INTO Acoes 
                        (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) 
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
             valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status)
             cursor.execute(query, valores)
-            
         conn.commit()
         cursor.close()
         conn.close()
@@ -105,13 +100,12 @@ def gerar_pdf(acoes):
     buffer.seek(0)
     return buffer.getvalue()
 
-# Inicializa o estado de login e edição
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 if 'edit_item' not in st.session_state:
     st.session_state['edit_item'] = None
 
-# --- TELA DE LOGIN (BARREIRA) ---
+# --- TELA DE LOGIN ---
 if not st.session_state['logado']:
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
@@ -145,7 +139,7 @@ with col_log:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# Buscar dados do banco SQLite
+# Buscar dados do banco
 acoes = []
 erro_banco = None
 try:
@@ -224,7 +218,7 @@ else:
 
 st.write("---")
 
-# --- CONFIGURAÇÃO DE VALORES PADRÃO SE ESTIVER EDITANDO ---
+# --- CONFIGURAÇÃO DE VALORES PADRÃO ---
 valores_padrao = {
     "id": "", "descricao": "", "porque": "", "onde": "", 
     "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None
@@ -249,10 +243,10 @@ if st.session_state['edit_item']:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- FORMULÁRIO ---
-st.subheader("Formulário: Nova Ação / Editar Ação")
+# --- FORMULÁRIO COM NOVA KEY FORÇADA ---
+st.subheader("Formulário: Registrar Informações")
 
-with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
+with st.form(key="formulario_plano_v3_atualizado"):
     id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
     descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
     porque = st.text_input("Por que", value=valores_padrao["porque"])
@@ -264,4 +258,8 @@ with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
     
     como = st.text_input("Como", value=valores_padrao["como"])
     quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"])
+    
+    lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
+    index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
+    status = st.selectbox("Status", lista_status, index=index_status)
     
