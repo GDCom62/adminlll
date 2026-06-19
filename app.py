@@ -20,8 +20,7 @@ SENHA_FIXA = "123"
 
 # CONEXÃO DIRETA COM A CLEVER CLOUD
 def get_db_connection():
-    # .strip() remove qualquer caractere invisível ou quebra de linha acidental nas pontas das strings
-    v_host = str("b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com").strip()
+    v_host = str("://clever-cloud.com").strip()
     v_user = str("uaoxaabon9ifpx5x").strip()
     v_pass = str("vDf6RJjOb2Bt16XX3YOg").strip()
     v_db   = str("b7dxmekynipigcv1sftu").strip()
@@ -233,7 +232,7 @@ if st.session_state['edit_item']:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- FORMULÁRIO ENCAPSULADO ---
+# --- FORMULÁRIO ---
 st.subheader("Formulário: Nova Ação / Editar Ação")
 
 with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
@@ -251,3 +250,5 @@ with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
     
     lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
     index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
+    status = st.selectbox("Status", lista_status, index=index_status)
+    
