@@ -21,7 +21,7 @@ SENHA_FIXA = "123"
 # CONEXÃO DIRETA COM A CLEVER CLOUD
 def get_db_connection():
     return mysql.connector.connect(
-        host="b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com",
+        host="://clever-cloud.com",
         user="uaoxaabon9ifpx5x",
         password="vDf6RJjOb2Bt16XX3YOg",
         database="b7dxmekynipigcv1sftu",
@@ -135,17 +135,15 @@ else:
             mime="application/pdf"
         )
 
-    # --- NOVA SEÇÃO: LISTAGEM DOS ITENS SALVOS ---
+    # --- LISTAGEM DOS ITENS SALVOS ---
     st.write("---")
     st.subheader("📋 Ações Registradas")
     
     if acoes:
         df_tabela = pd.DataFrame(acoes)
-        # Renomeia as colunas para exibição amigável
         df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status"]
         st.dataframe(df_tabela, use_container_width=True, hide_index=True)
         
-        # Gerenciamento de registros (Editar / Excluir)
         st.write("**Ações de Gerenciamento:**")
         col_sel, col_btn_ed, col_btn_ex = st.columns([2, 1, 1])
         
@@ -242,3 +240,5 @@ else:
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     
+                    if id_limpo:  # Se tem ID, atualiza (UPDATE)
+                        query = """UPDATE Acoes SET 
