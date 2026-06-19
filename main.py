@@ -204,6 +204,6 @@ with tab_lista:
     else:
         st.info("Nenhuma ação cadastrada ou correspondente aos filtros.")
 
-# --- ABA DE GRÁFICOS CORRIGIDA ---
+# --- ABA DE GRÁFICOS ---
 with tab_graficos:
     if not df.empty:
