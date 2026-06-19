@@ -1,16 +1,8 @@
 import streamlit as st
 import mysql.connector
-from datetime import datetime
-import io
 import pandas as pd
 import base64
 import os
-
-# Bibliotecas para geração de PDF
-from reportlab.lib.pagesizes import landscape, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
 
 # Configuração da página Streamlit
 st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
@@ -28,32 +20,6 @@ def get_db_connection():
         database="b7dxmekynipigcv1sftu",
         port=3306
     )
-
-# Função para gerar PDF corrigida definitivamente na linha 45
-def gerar_pdf(acoes):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
-    elements = []
-    styles = getSampleStyleSheet()
-    elements.append(Paragraph("PLANO DE AÇÃO ADMINISTRATIVO", styles['Title']))
-    elements.append(Spacer(1, 12))
-
-    data = [["Ação (What)", "Responsável", "Prazo", "Status", "Como (How)", "QUANDO (Det)"]]
-    for a in acoes:
-        data.append([str(a[1]), str(a[4]), str(a[5]), str(a[8]), str(a[6]), str(a[7])])
-
-    # CORREÇÃO DO ERRO: Adicionado os valores numéricos exatos de largura das colunas do PDF
-    t = Table(data, colWidths=[150, 100, 80, 80, 200, 150])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.navy),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-    ]))
-    elements.append(t)
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer.getvalue()
 
 # Inicializa o estado de login e edição
 if 'logado' not in st.session_state:
@@ -100,8 +66,8 @@ else:
     erro_banco = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id_acao, descricao_acao, porque, onde, id_responsavel, DATE_FORMAT(prazo, '%Y-%m-%d'), como, quando_detalhe, status FROM Acoes ORDER BY prazo ASC")
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id_acao, descricao_acao, porque, onde, id_responsavel, CAST(prazo AS CHAR) as prazo, como, quando_detalhe, status FROM Acoes")
         acoes = cursor.fetchall()
         conn.close()
     except Exception as e:
@@ -117,41 +83,33 @@ else:
     status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
     if acoes:
         for a in acoes:
-            status_atual = str(a[8])
+            status_atual = a['status']
             if status_atual in status_contagem:
                 status_contagem[status_atual] += 1
     
     df_grafico = pd.DataFrame(list(status_contagem.items()), columns=["Status", "Quantidade"])
     st.bar_chart(df_grafico, x="Status", y="Quantidade", color="#1f77b4")
 
-    if acoes:
-        pdf_data = gerar_pdf(acoes)
-        st.download_button(
-            label="📄 Gerar e Baixar PDF",
-            data=pdf_data,
-            file_name="Plano_Lavo_Levo.pdf",
-            mime="application/pdf"
-        )
-
     st.write("---")
 
     # --- CONFIGURAÇÃO DE VALORES PADRÃO SE ESTIVER EDITANDO ---
     valores_padrao = {
         "id": "", "descricao": "", "porque": "", "onde": "", 
-        "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1"
+        "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None
     }
     
     if st.session_state['edit_item']:
         item = st.session_state['edit_item']
         valores_padrao = {
-            "id": str(item[0]),
-            "descricao": str(item[1]),
-            "porque": str(item[2]) if item[2] else "",
-            "onde": str(item[3]) if item[3] else "",
-            "id_responsavel": str(item[4]),
-            "como": str(item[6]) if item[6] else "",
-            "quando_detalhe": str(item[7]) if item[7] else "",
-            "status": str(item[8])
+            "id": str(item['id_acao']),
+            "descricao": str(item['descricao_acao']),
+            "porque": str(item['porque']),
+            "onde": str(item['onde']),
+            "id_responsavel": str(item['id_responsavel']),
+            "como": str(item['como']),
+            "quando_detalhe": str(item['quando_detalhe']),
+            "status": str(item['status']),
+            "prazo": item['prazo']
         }
         st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
 
@@ -162,17 +120,12 @@ else:
         descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
         porque = st.text_input("Por que", value=valores_padrao["porque"])
         onde = st.text_input("Onde", value=valores_padrao["onde"])
-        
         responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"])
         
-        prazo_val = datetime.now().date()
-        if st.session_state['edit_item'] and item:
-            try:
-                prazo_val = datetime.strptime(str(item[5]), "%Y-%m-%d").date()
-            except Exception:
-                pass
-                
+        # Define data padrão segura
+        prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
         prazo = st.date_input("Prazo *", value=prazo_val)
+        
         como = st.text_input("Como", value=valores_padrao["como"])
         quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"])
         
@@ -198,8 +151,8 @@ else:
                 v_onde = onde.strip() if onde.strip() != "" else None
                 v_como = como.strip() if como.strip() != "" else None
                 v_quando = quando_detalhe.strip() if quando_detalhe.strip() != "" else None
-                
                 id_resp_final = int(responsavel_id_input.strip()) if responsavel_id_input.strip().isdigit() else 1
+                
                 dados = (descricao.strip(), v_porque, v_onde, id_resp_final, prazo.strftime('%Y-%m-%d'), v_como, v_quando, status)
                 
                 try:
@@ -218,26 +171,56 @@ else:
                     st.success("Item gravado com sucesso!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Erro interno ao salvar: {e}")
+                    st.error(f"Erro ao salvar: {e}")
 
     st.write("---")
 
-    # --- LISTAGEM PURA PARSEADA VIA STRING CORRIGIDA ---
+    # --- LISTAGEM DEFINITIVA E DIRETA EM TABELA INTERATIVA (SEM TRAVAS) ---
     st.subheader("Ações Cadastradas")
     if acoes:
-        hoje_atual = datetime.now().date()
-        for a in acoes:
-            try:
-                dt_pz = datetime.strptime(str(a[5]), "%Y-%m-%d").date()
-            except Exception:
-                dt_pz = hoje_atual
-                
-            esta_atrasado = dt_pz < hoje_atual and str(a[8]) != "Concluído"
-            
-            cor_fundo = "#fff2f2" if esta_atrasado else "#f9f9f9"
-            cor_borda = "#ff4d4d" if esta_atrasado else "#ddd"
-            texto_status = f"🚨 {str(a[8])} (ATRASADO)" if esta_atrasado else f"📌 {str(a[8])}"
-            
-            with st.container():
-                html_card = "<div style='border:1px solid " + cor_borda + "; background-color:" + cor_fundo + "; padding:15px; border-radius:8px; margin-bottom:12px;'>"
-                html_card += "<h4>ID #" + str(a[0]) + " - " + str(a[1]) + "</h4>"
+        # Converte as ações diretamente para uma tabela dataframe nativa do Streamlit
+        df = pd.DataFrame(acoes)
+        df.columns = ["ID", "Ação (What)", "Por que", "Onde", "ID Resp.", "Prazo (Quando)", "Como", "Quando Det.", "Status"]
+        df = df[["ID", "Ação (What)", "Prazo (Quando)", "Status", "Por que", "Onde", "Como", "Quando Det."]]
+        
+        # Exibe a tabela cheia de dados de forma 100% garantida
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        # --- PAINEL DE CONTROLE DE OPERAÇÕES ---
+        st.write("<br>", unsafe_allow_html=True)
+        st.caption("⚙️ **Painel de Controle de Itens Cadastrados**")
+        
+        col_op_id, col_op_edit, col_op_del = st.columns(3)
+        with col_op_id:
+            id_operacao = st.text_input("ID da Ação para gerenciar", key="id_operacao_input", placeholder="Ex: 1")
+        
+        with col_op_edit:
+            st.write("<br>", unsafe_allow_html=True)
+            if st.button("📝 Carregar para Editar Ação", use_container_width=True):
+                if id_operacao.strip().isdigit():
+                    target_id = int(id_operacao.strip())
+                    item_encontrado = next((item for item in acoes if int(item['id_acao']) == target_id), None)
+                    if item_encontrado:
+                        st.session_state['edit_item'] = item_encontrado
+                        st.rerun()
+                    else:
+                        st.error(f"ID #{target_id} não localizado.")
+                else:
+                    st.warning("Digite um número de ID válido.")
+                    
+        with col_op_del:
+            st.write("<br>", unsafe_allow_html=True)
+            if st.button("❌ Confirmar e Apagar Ação", type="secondary", use_container_width=True):
+                if id_operacao.strip().isdigit():
+                    try:
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (int(id_operacao),))
+                        conn.commit()
+                        cursor.close()
+                        conn.close()
+                        if st.session_state['edit_item'] and int(st.session_state['edit_item']['id_acao']) == int(id_operacao):
+                            st.session_state['edit_item'] = None
+                        st.success(f"Ação #{id_operacao} excluída!")
+                        st.rerun()
+                    except Exception as e:
