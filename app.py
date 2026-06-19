@@ -18,18 +18,17 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO DIRETA COM A CLEVER CLOUD
+# CONEXÃO BLINDADA COM A CLEVER CLOUD
 def get_db_connection():
-    v_host = str("://clever-cloud.com").strip()
-    v_user = str("uaoxaabon9ifpx5x").strip()
-    v_pass = str("vDf6RJjOb2Bt16XX3YOg").strip()
-    v_db   = str("b7dxmekynipigcv1sftu").strip()
+    # Montagem ultra-limpa do host para limpar qualquer lixo ou protocolo invisible (://)
+    host_puro = "b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com"
+    host_puro = host_puro.replace("https://", "").replace("http://", "").replace("://", "").strip()
     
     return mysql.connector.connect(
-        host=v_host,
-        user=v_user,
-        password=v_pass,
-        database=v_db,
+        host=host_puro,
+        user="uaoxaabon9ifpx5x",
+        password="vDf6RJjOb2Bt16XX3YOg",
+        database="b7dxmekynipigcv1sftu",
         port=3306
     )
 
@@ -250,5 +249,3 @@ with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
     
     lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
     index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
-    status = st.selectbox("Status", lista_status, index=index_status)
-    
