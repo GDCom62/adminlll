@@ -18,14 +18,11 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO DIRETA E LIMPA COM A CLEVER CLOUD
+# CONEXÃO DIRETA COM A CLEVER CLOUD
 def get_db_connection():
-    # Remove qualquer protocolo ou caractere oculto que o cache tente injetar
-    host_cru = "b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com"
-    host_limpo = host_cru.replace("https://", "").replace("http://", "").replace("://", "").strip()
-    
+    v_host = str("://clever-cloud.com").strip()
     return mysql.connector.connect(
-        host=host_limpo,
+        host=v_host,
         user="uaoxaabon9ifpx5x",
         password="vDf6RJjOb2Bt16XX3YOg",
         database="b7dxmekynipigcv1sftu",
@@ -75,8 +72,8 @@ def gerar_pdf(acoes):
             str(a['como']), str(a['quando_detalhe'])
         ])
 
-    # Definindo larguras fixas em pontos para evitar travamentos de renderização
-    t = Table(data, colWidths=[40, 150, 70, 80, 120, 100, 120, 100])
+    # CORREÇÃO: Larguras reais em pontos definidas explicitamente
+    t = Table(data, colWidths=[40, 160, 70, 80, 120, 100, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -233,7 +230,7 @@ if st.session_state['edit_item']:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- PAINEL DE ENTRADA LIVRE (SEM BLOCKS INTERNOS TRAVADOS) ---
+# --- PAINEL OPERACIONAL DIRETO (SEM ST.FORM) ---
 st.subheader("Painel: Registrar Informações")
 
 id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id")
@@ -246,3 +243,6 @@ prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["pr
 prazo = st.date_input("Prazo *", value=prazo_val, key="input_prazo")
 
 como = st.text_input("Como", value=valores_padrao["como"], key="input_como")
+quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"], key="input_quando")
+
+lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
