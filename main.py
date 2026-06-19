@@ -18,7 +18,7 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO LOCAL COM SQLITE
+# CONEXÃO LOCAL COM SQLITE (Imune a erros de internet e host)
 def get_db_connection():
     conn = sqlite3.connect("banco_plano_acao_local.db")
     conn.row_factory = sqlite3.Row
@@ -90,7 +90,7 @@ def gerar_pdf(acoes):
             str(a['como']), str(a['quando_detalhe'])
         ])
 
-    # CORREÇÃO DEFINITIVA: Valores numéricos de larguras adicionados para não quebrar a compilação
+    # CORREÇÃO DEFINITIVA: Adicionado os tamanhos das colunas em pixels [40, 150, ...]
     t = Table(data, colWidths=[40, 150, 70, 80, 120, 100, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -257,5 +257,3 @@ onde = st.text_input("Onde", value=valores_padrao["onde"], key="input_onde")
 responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"], key="input_resp")
 
 prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
-prazo = st.date_input("Prazo *", value=prazo_val, key="input_prazo")
-
