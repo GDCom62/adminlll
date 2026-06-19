@@ -145,7 +145,7 @@ else:
         st.dataframe(df_tabela, use_container_width=True, hide_index=True)
         
         st.write("**Ações de Gerenciamento:**")
-        col_sel, col_btn_ed, col_btn_ex = st.columns([2, 1, 1])
+        col_sel, col_btn_ed, col_btn_ex = st.columns(3)
         
         with col_sel:
             id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes])
@@ -240,5 +240,4 @@ else:
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     
-                    if id_limpo:  # Se tem ID, atualiza (UPDATE)
-                        query = """UPDATE Acoes SET 
+                    if id_limpo:
