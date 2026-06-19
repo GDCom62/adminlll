@@ -135,6 +135,47 @@ else:
             mime="application/pdf"
         )
 
+    # --- NOVA SEÇÃO: LISTAGEM DOS ITENS SALVOS ---
+    st.write("---")
+    st.subheader("📋 Ações Registradas")
+    
+    if acoes:
+        df_tabela = pd.DataFrame(acoes)
+        # Renomeia as colunas para exibição amigável
+        df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status"]
+        st.dataframe(df_tabela, use_container_width=True, hide_index=True)
+        
+        # Gerenciamento de registros (Editar / Excluir)
+        st.write("**Ações de Gerenciamento:**")
+        col_sel, col_btn_ed, col_btn_ex = st.columns([2, 1, 1])
+        
+        with col_sel:
+            id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes])
+        
+        with col_btn_ed:
+            if st.button("✏️ Editar Selecionado", use_container_width=True):
+                item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
+                if item_procurado:
+                    st.session_state['edit_item'] = item_procurado
+                    st.rerun()
+                    
+        with col_btn_ex:
+            if st.button("🗑️ Excluir Selecionado", use_container_width=True):
+                try:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (id_selecionado,))
+                    conn.commit()
+                    conn.close()
+                    st.success(f"Ação ID #{id_selecionado} excluída com sucesso!")
+                    if st.session_state['edit_item'] and st.session_state['edit_item']['id_acao'] == id_selecionado:
+                        st.session_state['edit_item'] = None
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao excluir: {e}")
+    else:
+        st.info("Nenhuma ação cadastrada no banco de dados até o momento.")
+
     st.write("---")
 
     # --- CONFIGURAÇÃO DE VALORES PADRÃO SE ESTIVER EDITANDO ---
@@ -197,45 +238,7 @@ else:
                 v_quando = quando_detalhe.strip() if quando_detalhe.strip() != "" else None
                 id_resp_final = int(responsavel_id_input.strip()) if responsavel_id_input.strip().isdigit() else 1
                 
-                dados = (descricao.strip(), v_porque, v_onde, id_resp_final, prazo.strftime('%Y-%m-%d'), v_como, v_quando, status)
-                
                 try:
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    if id_limpo != "":
-                        sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
-                        cursor.execute(sql, dados + (int(id_limpo),))
-                        st.session_state['edit_item'] = None
-                    else:
-                        sql = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-                        cursor.execute(sql, dados)
-                    conn.commit()
-                    cursor.close()
-                    conn.close()
-                    st.success("Item gravado com sucesso!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao salvar: {e}")
-
-    st.write("---")
-
-    # --- LISTAGEM EM TABELA INTERATIVA ---
-    st.subheader("Ações Cadastradas")
-    if acoes:
-        df = pd.DataFrame(acoes)
-        df.columns = ["ID", "Ação (What)", "Por que", "Onde", "ID Resp.", "Prazo (Quando)", "Como", "Quando Det.", "Status"]
-        df = df[["ID", "Ação (What)", "Prazo (Quando)", "Status", "Por que", "Onde", "Como", "Quando Det."]]
-        
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        # --- PAINEL DE CONTROLE DE OPERAÇÕES ---
-        st.write("<br>", unsafe_allow_html=True)
-        st.caption("⚙️ **Painel de Controle de Itens Cadastrados**")
-        
-        col_op_id, col_op_edit, col_op_del = st.columns(3)
-        with col_op_id:
-            id_operacao = st.text_input("ID da Ação para gerenciar", key="id_operacao_input", placeholder="Ex: 1")
-        
-        with col_op_edit:
-            st.write("<br>", unsafe_allow_html=True)
-            if st.button("📝 Carregar para Editar Ação", use_container_width=True):
+                    
