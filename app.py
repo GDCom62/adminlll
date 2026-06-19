@@ -88,6 +88,7 @@ def gerar_pdf(acoes):
             str(a['como']), str(a['quando_detalhe'])
         ])
 
+    # CORREÇÃO CRUCIAL: Adicionado os valores numéricos das larguras que faltavam
     t = Table(data, colWidths=[40, 150, 70, 80, 120, 100, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -244,10 +245,10 @@ if st.session_state['edit_item']:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- FORMULÁRIO CORRIGIDO COM SINTAXE RECOMENDADA ---
+# --- FORMULÁRIO COM NOVA CHAVE ÚNICA ---
 st.subheader("Painel: Registrar Informações")
 
-with st.form(key="formulario_final_plano_v4"):
+with st.form(key="formulario_plano_v5_finalizado"):
     id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id")
     descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"], key="input_desc")
     porque = st.text_input("Por que", value=valores_padrao["porque"], key="input_porque")
