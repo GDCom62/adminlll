@@ -28,6 +28,25 @@ def get_db_connection():
         port=3306
     )
 
+# Função isolada para salvar ou atualizar dados no Banco de Dados
+def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        if id_limpo:
+            query = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
+            valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, int(id_limpo))
+            cursor.execute(query, valores)
+        else:
+            query = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status)
+            cursor.execute(query, valores)
+        conn.commit()
+        conn.close()
+        return True, "Salvo com sucesso!"
+    except Exception as e:
+        return False, str(e)
+
 # Função para gerar PDF
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
@@ -221,23 +240,3 @@ else:
             submit = st.form_submit_button("💾 Salvar")
         with col_btn_can:
             if st.session_state['edit_item']:
-                if st.form_submit_button("❌ Cancelar Edição"):
-                    st.session_state['edit_item'] = None
-                    st.rerun()
-        
-        if submit:
-            id_limpo = id_acao.strip()
-            if not descricao.strip():
-                st.error("A descrição é obrigatória.")
-            else:
-                v_porque = porque.strip() if porque.strip() != "" else None
-                v_onde = onde.strip() if onde.strip() != "" else None
-                v_como = como.strip() if como.strip() != "" else None
-                v_quando = quando_detalhe.strip() if quando_detalhe.strip() != "" else None
-                id_resp_final = int(responsavel_id_input.strip()) if responsavel_id_input.strip().isdigit() else 1
-                
-                try:
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    if id_limpo:
-                        query = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
