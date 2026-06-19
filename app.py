@@ -117,10 +117,10 @@ if not st.session_state['logado']:
     col_b1, col_b2, col_b3 = st.columns(3)
     with col_b2:
         st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
-        usuario = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
+        usuario = st.text_input("Usuário", key="login_user")
+        senha = st.text_input("Senha", type="password", key="login_pass")
         
-        if st.button("Entrar", use_container_width=True):
+        if st.button("Entrar", use_container_width=True, key="btn_entrar"):
             if usuario == USUARIO_FIXO and senha == SENHA_FIXA:
                 st.session_state['logado'] = True
                 st.rerun()
@@ -134,7 +134,7 @@ with col_tit:
     st.title("Plano de Ação Lavo e Levo")
 with col_log:
     st.write("<br>", unsafe_allow_html=True)
-    if st.button("Sair (Logout)", use_container_width=True):
+    if st.button("Sair (Logout)", use_container_width=True, key="btn_logout"):
         st.session_state['logado'] = False
         st.session_state['edit_item'] = None
         st.rerun()
@@ -174,7 +174,8 @@ if acoes:
         label="📄 Gerar e Baixar PDF",
         data=pdf_data,
         file_name="Plano_Lavo_Levo.pdf",
-        mime="application/pdf"
+        mime="application/pdf",
+        key="btn_download_pdf"
     )
 
 # --- LISTAGEM DOS ITENS SALVOS ---
@@ -190,17 +191,17 @@ if acoes:
     col_sel, col_btn_ed, col_btn_ex = st.columns(3)
     
     with col_sel:
-        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes])
+        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_manutencao")
     
     with col_btn_ed:
-        if st.button("✏️ Editar Selecionado", use_container_width=True):
+        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item"):
             item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
             if item_procurado:
                 st.session_state['edit_item'] = item_procurado
                 st.rerun()
                 
     with col_btn_ex:
-        if st.button("🗑️ Excluir Selecionado", use_container_width=True):
+        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item"):
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -239,27 +240,22 @@ if st.session_state['edit_item']:
     }
     st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
     
-    if st.button("❌ Cancelar Modo Edição e Voltar ao Novo Cadastro", use_container_width=True):
+    if st.button("❌ Cancelar Modo Edição e Voltar ao Novo Cadastro", use_container_width=True, key="btn_cancelar_edicao"):
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- FORMULÁRIO COM NOVA KEY FORÇADA ---
-st.subheader("Formulário: Registrar Informações")
+# --- CONTAINER DE ENTRADA LIVRE (SEM ST.FORM PARA IMPEDIR ERROS DE SUBMIT) ---
+st.subheader("Painel: Registrar Informações")
 
-with st.form(key="formulario_plano_v3_atualizado"):
-    id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
-    descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
-    porque = st.text_input("Por que", value=valores_padrao["porque"])
-    onde = st.text_input("Onde", value=valores_padrao["onde"])
-    responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"])
-    
-    prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
-    prazo = st.date_input("Prazo *", value=prazo_val)
-    
-    como = st.text_input("Como", value=valores_padrao["como"])
-    quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"])
-    
-    lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
-    index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
-    status = st.selectbox("Status", lista_status, index=index_status)
-    
+id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id")
+descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"], key="input_desc")
+porque = st.text_input("Por que", value=valores_padrao["porque"], key="input_porque")
+onde = st.text_input("Onde", value=valores_padrao["onde"], key="input_onde")
+responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"], key="input_resp")
+
+prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
+prazo = st.date_input("Prazo *", value=prazo_val, key="input_prazo")
+
+como = st.text_input("Como", value=valores_padrao["como"], key="input_como")
+quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"], key="input_quando")
+
