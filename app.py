@@ -43,11 +43,11 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
             valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, int(id_limpo))
             cursor.execute(query, valores)
         else:
-            # Query de Criação (INSERT) - Removemos temporariamente id_responsavel caso cause erro de FK
+            # Query de Criação (INSERT)
             query = """INSERT INTO Acoes 
-                       (descricao_acao, porque, onde, prazo, como, quando_detalhe, status) 
-                       VALUES (%s, %s, %s, %s, %s, %s, %s)"""
-            valores = (descricao, v_porque, v_onde, prazo_str, v_como, v_quando, status)
+                       (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) 
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+            valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status)
             cursor.execute(query, valores)
             
         conn.commit()
@@ -55,7 +55,6 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         conn.close()
         return True, "Operação realizada com sucesso!"
     except mysql.connector.Error as err:
-        # Retorna o código e a mensagem de erro exata do MySQL
         return False, f"Erro MySQL {err.errno}: {err.msg}"
     except Exception as e:
         return False, str(e)
@@ -252,3 +251,5 @@ with st.form("form_acao", clear_on_submit=False):
     with col_btn_sub:
         submit = st.form_submit_button("💾 Salvar")
     with col_btn_can:
+        if st.session_state['edit_item']:
+            if st.form_submit_button("❌ Cancelar Edição"):
