@@ -227,9 +227,14 @@ if st.session_state['edit_item']:
         "prazo": item['prazo']
     }
     st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
+    
+    # Botão de Cancelar colocado de FORA do formulário para evitar erros de indentação
+    if st.button("❌ Cancelar Modo Edição e Voltar ao Novo Cadastro", use_container_width=True):
+        st.session_state['edit_item'] = None
+        st.rerun()
 
 # Formulário para Salvar/Editar
-st.subheader("Nova Ação / Editar Ação")
+st.subheader("Formulário: Nova Ação / Editar Ação")
 with st.form("form_acao", clear_on_submit=False):
     id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
     descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
@@ -247,7 +252,3 @@ with st.form("form_acao", clear_on_submit=False):
     index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
     status = st.selectbox("Status", lista_status, index=index_status)
     
-    # Linhas de comando simplificadas e sem colunas internas para os botões do formulário
-    submit = st.form_submit_button("💾 Salvar Alterações / Cadastrar", use_container_width=True)
-    
-    if st.session_state['edit_item']:
