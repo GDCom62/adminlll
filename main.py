@@ -18,7 +18,7 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO LOCAL COM SQLITE (Imune a erros de internet e host)
+# CONEXÃO LOCAL COM SQLITE (Substitui conexões de nuvem problemáticas)
 def get_db_connection():
     conn = sqlite3.connect("banco_plano_acao_local.db")
     conn.row_factory = sqlite3.Row
@@ -90,8 +90,8 @@ def gerar_pdf(acoes):
             str(a['como']), str(a['quando_detalhe'])
         ])
 
-    # CORREÇÃO DEFINITIVA: Adicionado os tamanhos das colunas em pixels [40, 150, ...]
-    t = Table(data, colWidths=[40, 150, 70, 80, 120, 100, 120, 100])
+    # CORREÇÃO CRUCIAL DEFINITIVA: Tamanhos fixados em pontos para as 8 colunas da tabela
+    t = Table(data, colWidths=[40, 160, 70, 80, 110, 100, 110, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
