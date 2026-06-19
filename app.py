@@ -21,7 +21,7 @@ SENHA_FIXA = "123"
 # CONEXÃO DIRETA COM A CLEVER CLOUD
 def get_db_connection():
     return mysql.connector.connect(
-        host="b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com",
+        host="://clever-cloud.com",
         user="uaoxaabon9ifpx5x",
         password="vDf6RJjOb2Bt16XX3YOg",
         database="b7dxmekynipigcv1sftu",
@@ -33,17 +33,30 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        if id_limpo:
-            query = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
+        
+        if id_limpo and id_limpo.isdigit():
+            # Query de Edição (UPDATE)
+            query = """UPDATE Acoes SET 
+                       descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, 
+                       prazo=%s, como=%s, quando_detalhe=%s, status=%s 
+                       WHERE id_acao=%s"""
             valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, int(id_limpo))
             cursor.execute(query, valores)
         else:
-            query = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-            valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status)
+            # Query de Criação (INSERT) - Removemos temporariamente id_responsavel caso cause erro de FK
+            query = """INSERT INTO Acoes 
+                       (descricao_acao, porque, onde, prazo, como, quando_detalhe, status) 
+                       VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+            valores = (descricao, v_porque, v_onde, prazo_str, v_como, v_quando, status)
             cursor.execute(query, valores)
+            
         conn.commit()
+        cursor.close()
         conn.close()
-        return True, "Salvo com sucesso!"
+        return True, "Operação realizada com sucesso!"
+    except mysql.connector.Error as err:
+        # Retorna o código e a mensagem de erro exata do MySQL
+        return False, f"Erro MySQL {err.errno}: {err.msg}"
     except Exception as e:
         return False, str(e)
 
@@ -103,7 +116,7 @@ if not st.session_state['logado']:
                 st.rerun()
             else:
                 st.error("Usuário ou senha incorretos.")
-    st.stop()  # Interrompe o script aqui se não estiver logado
+    st.stop()
 
 # --- PAINEL PRINCIPAL ---
 col_tit, col_log = st.columns(2)
@@ -208,7 +221,7 @@ if st.session_state['edit_item']:
         "descricao": str(item['descricao_acao']),
         "porque": str(item['porque']) if item['porque'] else "",
         "onde": str(item['onde']) if item['onde'] else "",
-        "id_responsavel": str(item['id_responsavel']),
+        "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
         "como": str(item['como']) if item['como'] else "",
         "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
         "status": str(item['status']),
@@ -239,15 +252,3 @@ with st.form("form_acao", clear_on_submit=False):
     with col_btn_sub:
         submit = st.form_submit_button("💾 Salvar")
     with col_btn_can:
-        if st.session_state['edit_item']:
-            if st.form_submit_button("❌ Cancelar Edição"):
-                st.session_state['edit_item'] = None
-                st.rerun()
-
-    if submit:
-        id_limpo = id_acao.strip()
-        if not descricao.strip():
-            st.error("A descrição é obrigatória.")
-        else:
-            v_porque = porque.strip() if porque.strip() != "" else None
-            v_onde = onde.strip() if onde.strip() != "" else None
