@@ -18,10 +18,10 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO DIRETA COM A CLEVER CLOUD (Limpa, sem caracteres ocultos)
+# CONEXÃO DIRETA COM A CLEVER CLOUD
 def get_db_connection():
     return mysql.connector.connect(
-        host="b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com",
+        host="://clever-cloud.com",
         user="uaoxaabon9ifpx5x",
         password="vDf6RJjOb2Bt16XX3YOg",
         database="b7dxmekynipigcv1sftu",
@@ -229,7 +229,7 @@ if st.session_state['edit_item']:
 
 # Formulário para Salvar/Editar
 st.subheader("Formulário: Nova Ação / Editar Ação")
-with st.form("form_acao", clear_on_submit=False):
+with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
     id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
     descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
     porque = st.text_input("Por que", value=valores_padrao["porque"])
@@ -246,7 +246,7 @@ with st.form("form_acao", clear_on_submit=False):
     index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
     status = st.selectbox("Status", lista_status, index=index_status)
     
-    # Botão de envio fixado obrigatoriamente dentro do 'with st.form'
     submit = st.form_submit_button("💾 Salvar Informações no Banco", use_container_width=True)
 
-    if submit:
+# Bloco de execução totalmente livre de aninhamentos e na raiz do arquivo
+if submit:
