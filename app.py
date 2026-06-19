@@ -18,13 +18,14 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO LOCAL COM SQLITE
+# CONEXÃO LOCAL E AUTOMÁTICA COM SQLITE (Substituindo a Clever Cloud off-line)
 def get_db_connection():
     conn = sqlite3.connect("banco_plano_acao.db")
+    # Configura para retornar os dados como se fossem dicionários (igual ao MySQL)
     conn.row_factory = sqlite3.Row
     return conn
 
-# Criação automática da tabela
+# Criação automática da tabela caso ela não exista no SQLite
 def inicializar_banco():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -44,14 +45,17 @@ def inicializar_banco():
     conn.commit()
     conn.close()
 
+# Inicializa a estrutura do banco local
 inicializar_banco()
 
-# Função para salvar no Banco
+# Função isolada para salvar ou atualizar dados no Banco de Dados
 def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        
         if id_limpo and id_limpo.isdigit():
+            # Query de Edição (UPDATE)
             query = """UPDATE Acoes SET 
                        descricao_acao=?, porque=?, onde=?, id_responsavel=?, 
                        prazo=?, como=?, quando_detalhe=?, status=? 
@@ -59,11 +63,13 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
             valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, int(id_limpo))
             cursor.execute(query, valores)
         else:
+            # Query de Criação (INSERT)
             query = """INSERT INTO Acoes 
                        (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) 
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
             valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status)
             cursor.execute(query, valores)
+            
         conn.commit()
         cursor.close()
         conn.close()
@@ -88,7 +94,6 @@ def gerar_pdf(acoes):
             str(a['como']), str(a['quando_detalhe'])
         ])
 
-    # CORREÇÃO CRUCIAL: Adicionado os valores numéricos das larguras que faltavam
     t = Table(data, colWidths=[40, 150, 70, 80, 120, 100, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -101,12 +106,13 @@ def gerar_pdf(acoes):
     buffer.seek(0)
     return buffer.getvalue()
 
+# Inicializa o estado de login e edição
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 if 'edit_item' not in st.session_state:
     st.session_state['edit_item'] = None
 
-# --- TELA DE LOGIN ---
+# --- TELA DE LOGIN (BARREIRA) ---
 if not st.session_state['logado']:
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
@@ -118,10 +124,10 @@ if not st.session_state['logado']:
     col_b1, col_b2, col_b3 = st.columns(3)
     with col_b2:
         st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
-        usuario = st.text_input("Usuário", key="login_user")
-        senha = st.text_input("Senha", type="password", key="login_pass")
+        usuario = st.text_input("Usuário")
+        senha = st.text_input("Senha", type="password")
         
-        if st.button("Entrar", use_container_width=True, key="btn_entrar"):
+        if st.button("Entrar", use_container_width=True):
             if usuario == USUARIO_FIXO and senha == SENHA_FIXA:
                 st.session_state['logado'] = True
                 st.rerun()
@@ -135,18 +141,19 @@ with col_tit:
     st.title("Plano de Ação Lavo e Levo")
 with col_log:
     st.write("<br>", unsafe_allow_html=True)
-    if st.button("Sair (Logout)", use_container_width=True, key="btn_logout"):
+    if st.button("Sair (Logout)", use_container_width=True):
         st.session_state['logado'] = False
         st.session_state['edit_item'] = None
         st.rerun()
 
-# Buscar dados do banco
+# Buscar dados do banco SQLite
 acoes = []
 erro_banco = None
 try:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id_acao, descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status FROM Acoes ORDER BY prazo ASC")
+    # Converte os resultados do SQLite para formato de dicionário padrão
     acoes = [dict(row) for row in cursor.fetchall()]
     conn.close()
 except Exception as e:
@@ -175,8 +182,7 @@ if acoes:
         label="📄 Gerar e Baixar PDF",
         data=pdf_data,
         file_name="Plano_Lavo_Levo.pdf",
-        mime="application/pdf",
-        key="btn_download_pdf"
+        mime="application/pdf"
     )
 
 # --- LISTAGEM DOS ITENS SALVOS ---
@@ -192,17 +198,17 @@ if acoes:
     col_sel, col_btn_ed, col_btn_ex = st.columns(3)
     
     with col_sel:
-        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_manutencao")
+        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes])
     
     with col_btn_ed:
-        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item"):
+        if st.button("✏️ Editar Selecionado", use_container_width=True):
             item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
             if item_procurado:
                 st.session_state['edit_item'] = item_procurado
                 st.rerun()
                 
     with col_btn_ex:
-        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item"):
+        if st.button("🗑️ Excluir Selecionado", use_container_width=True):
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -220,7 +226,7 @@ else:
 
 st.write("---")
 
-# --- CONFIGURAÇÃO DE VALORES PADRÃO ---
+# --- CONFIGURAÇÃO DE VALORES PADRÃO SE ESTIVER EDITANDO ---
 valores_padrao = {
     "id": "", "descricao": "", "porque": "", "onde": "", 
     "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None
@@ -241,21 +247,18 @@ if st.session_state['edit_item']:
     }
     st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
     
-    if st.button("❌ Cancelar Modo Edição e Voltar ao Novo Cadastro", use_container_width=True, key="btn_cancelar_edicao"):
+    if st.button("❌ Cancelar Modo Edição e Voltar ao Novo Cadastro", use_container_width=True):
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- FORMULÁRIO COM NOVA CHAVE ÚNICA ---
-st.subheader("Painel: Registrar Informações")
+# --- FORMULÁRIO COMPATÍVEL COM SQLITE ---
+st.subheader("Formulário: Nova Ação / Editar Ação")
 
-with st.form(key="formulario_plano_v5_finalizado"):
-    id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id")
-    descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"], key="input_desc")
-    porque = st.text_input("Por que", value=valores_padrao["porque"], key="input_porque")
-    onde = st.text_input("Onde", value=valores_padrao["onde"], key="input_onde")
-    responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"], key="input_resp")
-
+with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
+    id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
+    descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
+    porque = st.text_input("Por que", value=valores_padrao["porque"])
+    onde = st.text_input("Onde", value=valores_padrao["onde"])
+    responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"])
+    
     prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
-    prazo = st.date_input("Prazo *", value=prazo_val, key="input_prazo")
-
-    como = st.text_input("Como", value=valores_padrao["como"], key="input_como")
