@@ -244,18 +244,17 @@ if st.session_state['edit_item']:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- CONTAINER DE ENTRADA LIVRE (SEM ST.FORM PARA IMPEDIR ERROS DE SUBMIT) ---
+# --- FORMULÁRIO CORRIGIDO COM SINTAXE RECOMENDADA ---
 st.subheader("Painel: Registrar Informações")
 
-id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id")
-descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"], key="input_desc")
-porque = st.text_input("Por que", value=valores_padrao["porque"], key="input_porque")
-onde = st.text_input("Onde", value=valores_padrao["onde"], key="input_onde")
-responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"], key="input_resp")
+with st.form(key="formulario_final_plano_v4"):
+    id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id")
+    descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"], key="input_desc")
+    porque = st.text_input("Por que", value=valores_padrao["porque"], key="input_porque")
+    onde = st.text_input("Onde", value=valores_padrao["onde"], key="input_onde")
+    responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"], key="input_resp")
 
-prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
-prazo = st.date_input("Prazo *", value=prazo_val, key="input_prazo")
+    prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
+    prazo = st.date_input("Prazo *", value=prazo_val, key="input_prazo")
 
-como = st.text_input("Como", value=valores_padrao["como"], key="input_como")
-quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"], key="input_quando")
-
+    como = st.text_input("Como", value=valores_padrao["como"], key="input_como")
