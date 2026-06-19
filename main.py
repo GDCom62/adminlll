@@ -165,7 +165,7 @@ with tab_lista:
         if filtro_status:
             df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-    # EXIBIÇÃO EM LISTA CARD POR CARD (Integrado com seu layout original)
+    # EXIBIÇÃO EM LISTA CARD POR CARD
     if not df_filtrado.empty:
         for _, row in df_filtrado.iterrows():
             dt_br = pd.to_datetime(row['prazo']).strftime('%d/%m/%Y')
@@ -204,5 +204,6 @@ with tab_lista:
     else:
         st.info("Nenhuma ação cadastrada ou correspondente aos filtros.")
 
-# --- ABA DE GRÁFICOS COMPLETA ---
+# --- ABA DE GRÁFICOS CORRIGIDA ---
 with tab_graficos:
+    if not df.empty:
