@@ -227,8 +227,9 @@ if st.session_state['edit_item']:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# Formulário para Salvar/Editar
+# --- FORMULÁRIO ENCAPSULADO PARA EVITAR ERROS DE INDENTAÇÃO ---
 st.subheader("Formulário: Nova Ação / Editar Ação")
+
 with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
     id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
     descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
@@ -247,6 +248,6 @@ with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
     status = st.selectbox("Status", lista_status, index=index_status)
     
     submit = st.form_submit_button("💾 Salvar Informações no Banco", use_container_width=True)
-
-# Bloco de execução totalmente livre de aninhamentos e na raiz do arquivo
-if submit:
+    
+    if submit:
+        id_limpo = id_acao.strip()
