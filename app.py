@@ -239,5 +239,5 @@ else:
                 try:
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    
                     if id_limpo:
+                        query = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
