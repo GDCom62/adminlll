@@ -247,9 +247,7 @@ with st.form("form_acao", clear_on_submit=False):
     index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
     status = st.selectbox("Status", lista_status, index=index_status)
     
-    col_btn_sub, col_btn_can = st.columns(2)
-    with col_btn_sub:
-        submit = st.form_submit_button("💾 Salvar")
-    with col_btn_can:
-        if st.session_state['edit_item']:
-            if st.form_submit_button("❌ Cancelar Edição"):
+    # Linhas de comando simplificadas e sem colunas internas para os botões do formulário
+    submit = st.form_submit_button("💾 Salvar Alterações / Cadastrar", use_container_width=True)
+    
+    if st.session_state['edit_item']:
