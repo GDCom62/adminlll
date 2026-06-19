@@ -18,9 +18,9 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO LOCAL COM SQLITE (Substitui conexões de nuvem problemáticas)
+# CONEXÃO LOCAL COM SQLITE (Substitui as conexões externas antigas)
 def get_db_connection():
-    conn = sqlite3.connect("banco_plano_acao_local.db")
+    conn = sqlite3.connect("banco_plano_acao_final.db")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -52,7 +52,6 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         conn = get_db_connection()
         cursor = conn.cursor()
         if id_limpo and id_limpo.isdigit():
-            # Query de Edição (UPDATE)
             query = """UPDATE Acoes SET 
                        descricao_acao=?, porque=?, onde=?, id_responsavel=?, 
                        prazo=?, como=?, quando_detalhe=?, status=? 
@@ -60,7 +59,6 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
             valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, int(id_limpo))
             cursor.execute(query, valores)
         else:
-            # Query de Criação (INSERT)
             query = """INSERT INTO Acoes 
                        (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) 
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
@@ -90,8 +88,8 @@ def gerar_pdf(acoes):
             str(a['como']), str(a['quando_detalhe'])
         ])
 
-    # CORREÇÃO CRUCIAL DEFINITIVA: Tamanhos fixados em pontos para as 8 colunas da tabela
-    t = Table(data, colWidths=[40, 160, 70, 80, 110, 100, 110, 100])
+    # CORREÇÃO DEFINITIVA: Larguras fixadas em pixels para evitar quebras de página
+    t = Table(data, colWidths=[40, 150, 70, 80, 120, 100, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -247,7 +245,7 @@ if st.session_state['edit_item']:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- PAINEL OPERACIONAL ---
+# --- PAINEL OPERACIONAL DIRETO ---
 st.subheader("Painel: Registrar Informações")
 
 id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id")
@@ -257,3 +255,5 @@ onde = st.text_input("Onde", value=valores_padrao["onde"], key="input_onde")
 responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"], key="input_resp")
 
 prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
+prazo = st.date_input("Prazo *", value=prazo_val, key="input_prazo")
+
