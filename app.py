@@ -45,7 +45,7 @@ def gerar_pdf(acoes):
             str(a['como']), str(a['quando_detalhe'])
         ])
 
-    t = Table(data, colWidths=[40, 150, 70, 80, 100, 100, 100, 100])
+    t = Table(data, colWidths=[40, 150, 70, 80, 120, 100, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
