@@ -28,7 +28,7 @@ def get_db_connection():
         port=3306
     )
 
-# Função para gerar PDF corrigida de ponta a ponta
+# Função para gerar PDF
 def gerar_pdf(acoes):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
@@ -45,7 +45,7 @@ def gerar_pdf(acoes):
             str(a['como']), str(a['quando_detalhe'])
         ])
 
-    t = Table(data, colWidths=[40, 150, 70, 80, 120, 100, 120, 100])
+    t = Table(data, colWidths=[40, 150, 70, 80, 100, 100, 100, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
