@@ -20,11 +20,17 @@ SENHA_FIXA = "123"
 
 # CONEXÃO DIRETA COM A CLEVER CLOUD
 def get_db_connection():
+    # .strip() remove qualquer caractere invisível ou quebra de linha acidental nas pontas das strings
+    v_host = str("b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com").strip()
+    v_user = str("uaoxaabon9ifpx5x").strip()
+    v_pass = str("vDf6RJjOb2Bt16XX3YOg").strip()
+    v_db   = str("b7dxmekynipigcv1sftu").strip()
+    
     return mysql.connector.connect(
-        host="://clever-cloud.com",
-        user="uaoxaabon9ifpx5x",
-        password="vDf6RJjOb2Bt16XX3YOg",
-        database="b7dxmekynipigcv1sftu",
+        host=v_host,
+        user=v_user,
+        password=v_pass,
+        database=v_db,
         port=3306
     )
 
@@ -227,7 +233,7 @@ if st.session_state['edit_item']:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- FORMULÁRIO ENCAPSULADO PARA EVITAR ERROS DE INDENTAÇÃO ---
+# --- FORMULÁRIO ENCAPSULADO ---
 st.subheader("Formulário: Nova Ação / Editar Ação")
 
 with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
@@ -245,9 +251,3 @@ with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
     
     lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
     index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
-    status = st.selectbox("Status", lista_status, index=index_status)
-    
-    submit = st.form_submit_button("💾 Salvar Informações no Banco", use_container_width=True)
-    
-    if submit:
-        id_limpo = id_acao.strip()
