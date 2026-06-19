@@ -1,5 +1,5 @@
 import streamlit as st
-import mysql.connector
+import sqlite3
 import pandas as pd
 import base64
 import os
@@ -18,19 +18,35 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO BLINDADA COM A CLEVER CLOUD
+# CONEXÃO LOCAL E AUTOMÁTICA COM SQLITE (Substituindo a Clever Cloud off-line)
 def get_db_connection():
-    # Montagem ultra-limpa do host para limpar qualquer lixo ou protocolo invisible (://)
-    host_puro = "b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com"
-    host_puro = host_puro.replace("https://", "").replace("http://", "").replace("://", "").strip()
-    
-    return mysql.connector.connect(
-        host=host_puro,
-        user="uaoxaabon9ifpx5x",
-        password="vDf6RJjOb2Bt16XX3YOg",
-        database="b7dxmekynipigcv1sftu",
-        port=3306
-    )
+    conn = sqlite3.connect("banco_plano_acao.db")
+    # Configura para retornar os dados como se fossem dicionários (igual ao MySQL)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# Criação automática da tabela caso ela não exista no SQLite
+def inicializar_banco():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Acoes (
+            id_acao INTEGER PRIMARY KEY AUTOINCREMENT,
+            descricao_acao TEXT NOT NULL,
+            porque TEXT,
+            onde TEXT,
+            id_responsavel INTEGER,
+            prazo TEXT,
+            como TEXT,
+            quando_detalhe TEXT,
+            status TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+# Inicializa a estrutura do banco local
+inicializar_banco()
 
 # Função isolada para salvar ou atualizar dados no Banco de Dados
 def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status):
@@ -40,12 +56,17 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         
         if id_limpo and id_limpo.isdigit():
             # Query de Edição (UPDATE)
-            query = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
+            query = """UPDATE Acoes SET 
+                       descricao_acao=?, porque=?, onde=?, id_responsavel=?, 
+                       prazo=?, como=?, quando_detalhe=?, status=? 
+                       WHERE id_acao=?"""
             valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, int(id_limpo))
             cursor.execute(query, valores)
         else:
             # Query de Criação (INSERT)
-            query = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            query = """INSERT INTO Acoes 
+                       (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
             valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status)
             cursor.execute(query, valores)
             
@@ -53,8 +74,6 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         cursor.close()
         conn.close()
         return True, "Operação realizada com sucesso!"
-    except mysql.connector.Error as err:
-        return False, f"Erro MySQL {err.errno}: {err.msg}"
     except Exception as e:
         return False, str(e)
 
@@ -127,20 +146,21 @@ with col_log:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# Buscar dados do banco
+# Buscar dados do banco SQLite
 acoes = []
 erro_banco = None
 try:
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id_acao, descricao_acao, porque, onde, id_responsavel, CAST(prazo AS CHAR) as prazo, como, quando_detalhe, status FROM Acoes ORDER BY prazo ASC")
-    acoes = cursor.fetchall()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id_acao, descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status FROM Acoes ORDER BY prazo ASC")
+    # Converte os resultados do SQLite para formato de dicionário padrão
+    acoes = [dict(row) for row in cursor.fetchall()]
     conn.close()
 except Exception as e:
     erro_banco = str(e)
 
 if erro_banco:
-    st.error(f"Erro de conexão com a Clever Cloud: {erro_banco}")
+    st.error(f"Erro de conexão: {erro_banco}")
 
 # --- INDICADORES GRÁFICOS ---
 st.write("---")
@@ -192,7 +212,7 @@ if acoes:
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (id_selecionado,))
+                cursor.execute("DELETE FROM Acoes WHERE id_acao = ?", (id_selecionado,))
                 conn.commit()
                 conn.close()
                 st.success(f"Ação ID #{id_selecionado} excluída com sucesso!")
@@ -202,7 +222,7 @@ if acoes:
             except Exception as e:
                 st.error(f"Erro ao excluir: {e}")
 else:
-    st.info("Nenhuma ação cadastrada no banco de dados até o momento.")
+    st.info("Nenhuma ação cadastrada no sistema local até o momento.")
 
 st.write("---")
 
@@ -231,7 +251,7 @@ if st.session_state['edit_item']:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- FORMULÁRIO ---
+# --- FORMULÁRIO COMPATÍVEL COM SQLITE ---
 st.subheader("Formulário: Nova Ação / Editar Ação")
 
 with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
@@ -242,10 +262,3 @@ with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
     responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"])
     
     prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
-    prazo = st.date_input("Prazo *", value=prazo_val)
-    
-    como = st.text_input("Como", value=valores_padrao["como"])
-    quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"])
-    
-    lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
-    index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
