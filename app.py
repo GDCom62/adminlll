@@ -18,11 +18,14 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO DIRETA COM A CLEVER CLOUD
+# CONEXÃO DIRETA E LIMPA COM A CLEVER CLOUD
 def get_db_connection():
-    v_host = str("://clever-cloud.com").strip()
+    # Remove qualquer protocolo ou caractere oculto que o cache tente injetar
+    host_cru = "b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com"
+    host_limpo = host_cru.replace("https://", "").replace("http://", "").replace("://", "").strip()
+    
     return mysql.connector.connect(
-        host=v_host,
+        host=host_limpo,
         user="uaoxaabon9ifpx5x",
         password="vDf6RJjOb2Bt16XX3YOg",
         database="b7dxmekynipigcv1sftu",
@@ -72,6 +75,7 @@ def gerar_pdf(acoes):
             str(a['como']), str(a['quando_detalhe'])
         ])
 
+    # Definindo larguras fixas em pontos para evitar travamentos de renderização
     t = Table(data, colWidths=[40, 150, 70, 80, 120, 100, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -229,7 +233,7 @@ if st.session_state['edit_item']:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- PAINEL DE ENTRADA LIVRE (SEM ST.FORM) ---
+# --- PAINEL DE ENTRADA LIVRE (SEM BLOCKS INTERNOS TRAVADOS) ---
 st.subheader("Painel: Registrar Informações")
 
 id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id")
@@ -242,7 +246,3 @@ prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["pr
 prazo = st.date_input("Prazo *", value=prazo_val, key="input_prazo")
 
 como = st.text_input("Como", value=valores_padrao["como"], key="input_como")
-quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"], key="input_quando")
-
-lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
-index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
