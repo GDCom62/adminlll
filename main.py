@@ -18,7 +18,7 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO LOCAL COM SQLITE (Substituindo a Clever Cloud inacessível)
+# CONEXÃO LOCAL COM SQLITE
 def get_db_connection():
     conn = sqlite3.connect("banco_plano_acao_local.db")
     conn.row_factory = sqlite3.Row
@@ -90,6 +90,7 @@ def gerar_pdf(acoes):
             str(a['como']), str(a['quando_detalhe'])
         ])
 
+    # CORREÇÃO DEFINITIVA: Valores numéricos de larguras adicionados para não quebrar a compilação
     t = Table(data, colWidths=[40, 150, 70, 80, 120, 100, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
