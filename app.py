@@ -21,7 +21,7 @@ SENHA_FIXA = "123"
 # CONEXÃO DIRETA COM A CLEVER CLOUD
 def get_db_connection():
     return mysql.connector.connect(
-        host="://clever-cloud.com",
+        host="b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com",
         user="uaoxaabon9ifpx5x",
         password="vDf6RJjOb2Bt16XX3YOg",
         database="b7dxmekynipigcv1sftu",
@@ -105,7 +105,7 @@ if not st.session_state['logado']:
                 st.error("Usuário ou senha incorretos.")
     st.stop()  # Interrompe o script aqui se não estiver logado
 
-# --- PAINEL PRINCIPAL (DAQUI PARA BAIXO RODA SEM ANINHAMENTO) ---
+# --- PAINEL PRINCIPAL ---
 col_tit, col_log = st.columns(2)
 with col_tit:
     st.title("Plano de Ação Lavo e Levo")
@@ -250,3 +250,4 @@ with st.form("form_acao", clear_on_submit=False):
             st.error("A descrição é obrigatória.")
         else:
             v_porque = porque.strip() if porque.strip() != "" else None
+            v_onde = onde.strip() if onde.strip() != "" else None
