@@ -18,10 +18,10 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO DIRETA COM A CLEVER CLOUD
+# CONEXÃO DIRETA COM A CLEVER CLOUD (Limpa, sem caracteres ocultos)
 def get_db_connection():
     return mysql.connector.connect(
-        host="://clever-cloud.com",
+        host="b7dxmekynipigcv1sftu-mysql.services.clever-cloud.com",
         user="uaoxaabon9ifpx5x",
         password="vDf6RJjOb2Bt16XX3YOg",
         database="b7dxmekynipigcv1sftu",
@@ -36,17 +36,12 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         
         if id_limpo and id_limpo.isdigit():
             # Query de Edição (UPDATE)
-            query = """UPDATE Acoes SET 
-                       descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, 
-                       prazo=%s, como=%s, quando_detalhe=%s, status=%s 
-                       WHERE id_acao=%s"""
+            query = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
             valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, int(id_limpo))
             cursor.execute(query, valores)
         else:
             # Query de Criação (INSERT)
-            query = """INSERT INTO Acoes 
-                       (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) 
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+            query = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
             valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status)
             cursor.execute(query, valores)
             
@@ -251,4 +246,7 @@ with st.form("form_acao", clear_on_submit=False):
     index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
     status = st.selectbox("Status", lista_status, index=index_status)
     
-    # O botão obrigatoriamente deve fechar o contexto do formulário (with)
+    # Botão de envio fixado obrigatoriamente dentro do 'with st.form'
+    submit = st.form_submit_button("💾 Salvar Informações no Banco", use_container_width=True)
+
+    if submit:
