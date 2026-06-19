@@ -18,14 +18,13 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO LOCAL E AUTOMÁTICA COM SQLITE (Substituindo a Clever Cloud off-line)
+# CONEXÃO LOCAL E AUTOMÁTICA COM SQLITE
 def get_db_connection():
     conn = sqlite3.connect("banco_plano_acao.db")
-    # Configura para retornar os dados como se fossem dicionários (igual ao MySQL)
     conn.row_factory = sqlite3.Row
     return conn
 
-# Criação automática da tabela caso ela não exista no SQLite
+# Criação automática da tabela caso ela não exista
 def inicializar_banco():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -45,10 +44,10 @@ def inicializar_banco():
     conn.commit()
     conn.close()
 
-# Inicializa a estrutura do banco local
+# Inicializa o banco local
 inicializar_banco()
 
-# Função isolada para salvar ou atualizar dados no Banco de Dados
+# Função para salvar ou atualizar dados no Banco de Dados
 def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status):
     try:
         conn = get_db_connection()
@@ -153,7 +152,6 @@ try:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id_acao, descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status FROM Acoes ORDER BY prazo ASC")
-    # Converte os resultados do SQLite para formato de dicionário padrão
     acoes = [dict(row) for row in cursor.fetchall()]
     conn.close()
 except Exception as e:
@@ -251,7 +249,7 @@ if st.session_state['edit_item']:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# --- FORMULÁRIO COMPATÍVEL COM SQLITE ---
+# --- FORMULÁRIO ---
 st.subheader("Formulário: Nova Ação / Editar Ação")
 
 with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
@@ -262,3 +260,8 @@ with st.form(key="meu_formulario_plano_acao", clear_on_submit=False):
     responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"])
     
     prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
+    prazo = st.date_input("Prazo *", value=prazo_val)
+    
+    como = st.text_input("Como", value=valores_padrao["como"])
+    quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"])
+    
