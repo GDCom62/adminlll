@@ -1,259 +1,208 @@
 import streamlit as st
-import sqlite3
+import pymysql
 import pandas as pd
-import base64
-import os
+import plotly.express as px
+from datetime import datetime, date
 import io
 
-# Bibliotecas para geração de PDF
-from reportlab.lib.pagesizes import landscape, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
+# 1. CONFIGURAÇÃO DA PÁGINA
+st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 
-# Configuração da página Streamlit
-st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
-
-# CONFIGURAÇÃO DO LOGIN FIXO
-USUARIO_FIXO = "admin"
-SENHA_FIXA = "123"
-
-# CONEXÃO LOCAL COM SQLITE (Substitui as conexões externas antigas)
-def get_db_connection():
-    conn = sqlite3.connect("banco_plano_acao_final.db")
-    conn.row_factory = sqlite3.Row
-    return conn
-
-# Criação automática da tabela local se não existir
-def inicializar_banco():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS Acoes (
-            id_acao INTEGER PRIMARY KEY AUTOINCREMENT,
-            descricao_acao TEXT NOT NULL,
-            porque TEXT,
-            onde TEXT,
-            id_responsavel INTEGER,
-            prazo TEXT,
-            como TEXT,
-            quando_detalhe TEXT,
-            status TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-inicializar_banco()
-
-# Função para salvar ou atualizar dados no SQLite
-def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status):
+# 2. FUNÇÃO DE CONEXÃO
+def executar_db(sql, params=None, retorno=True):
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        if id_limpo and id_limpo.isdigit():
-            query = """UPDATE Acoes SET 
-                       descricao_acao=?, porque=?, onde=?, id_responsavel=?, 
-                       prazo=?, como=?, quando_detalhe=?, status=? 
-                       WHERE id_acao=?"""
-            valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, int(id_limpo))
-            cursor.execute(query, valores)
-        else:
-            query = """INSERT INTO Acoes 
-                       (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
-            valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status)
-            cursor.execute(query, valores)
-        conn.commit()
-        cursor.close()
-        conn.close()
-        return True, "Operação realizada com sucesso!"
-    except Exception as e:
-        return False, str(e)
-
-# Função para gerar PDF
-def gerar_pdf(acoes):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
-    elements = []
-    styles = getSampleStyleSheet()
-    elements.append(Paragraph("PLANO DE AÇÃO ADMINISTRATIVO", styles['Title']))
-    elements.append(Spacer(1, 12))
-
-    data = [["ID", "Ação (What)", "Prazo", "Status", "Por que", "Onde", "Como", "Quando Det."]]
-    for a in acoes:
-        data.append([
-            str(a['id_acao']), str(a['descricao_acao']), str(a['prazo']), 
-            str(a['status']), str(a['porque']), str(a['onde']), 
-            str(a['como']), str(a['quando_detalhe'])
-        ])
-
-    # CORREÇÃO DEFINITIVA: Larguras fixadas em pixels para evitar quebras de página
-    t = Table(data, colWidths=[40, 150, 70, 80, 120, 100, 120, 100])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.navy),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-    ]))
-    elements.append(t)
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer.getvalue()
-
-if 'logado' not in st.session_state:
-    st.session_state['logado'] = False
-if 'edit_item' not in st.session_state:
-    st.session_state['edit_item'] = None
-
-# --- TELA DE LOGIN ---
-if not st.session_state['logado']:
-    col_l1, col_l2, col_l3 = st.columns(3)
-    with col_l2:
-        try:
-            st.image("logo.png", use_container_width=True)
-        except Exception:
-            st.caption("📷 *[Insira o arquivo logo.png no seu GitHub]*")
-    
-    col_b1, col_b2, col_b3 = st.columns(3)
-    with col_b2:
-        st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
-        usuario = st.text_input("Usuário", key="login_user")
-        senha = st.text_input("Senha", type="password", key="login_pass")
-        
-        if st.button("Entrar", use_container_width=True, key="btn_entrar"):
-            if usuario == USUARIO_FIXO and senha == SENHA_FIXA:
-                st.session_state['logado'] = True
-                st.rerun()
+        conn = pymysql.connect(
+            host=st.secrets["DB_HOST"],
+            user=st.secrets["DB_USER"],
+            password=st.secrets["DB_PASSWORD"],
+            database=st.secrets["DB_NAME"],
+            port=int(st.secrets["DB_PORT"]),
+            ssl={'ssl': {}},
+            cursorclass=pymysql.cursors.DictCursor,
+            connect_timeout=10
+        )
+        with conn.cursor() as cursor:
+            cursor.execute(sql, params or ())
+            if retorno:
+                resultado = cursor.fetchall()
+                conn.close()
+                return resultado
             else:
-                st.error("Usuário ou senha incorretos.")
-    st.stop()
-
-# --- PAINEL PRINCIPAL ---
-col_tit, col_log = st.columns(2)
-with col_tit:
-    st.title("Plano de Ação Lavo e Levo")
-with col_log:
-    st.write("<br>", unsafe_allow_html=True)
-    if st.button("Sair (Logout)", use_container_width=True, key="btn_logout"):
-        st.session_state['logado'] = False
-        st.session_state['edit_item'] = None
-        st.rerun()
-
-# Buscar dados do banco local SQLite
-acoes = []
-erro_banco = None
-try:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id_acao, descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status FROM Acoes ORDER BY prazo ASC")
-    acoes = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-except Exception as e:
-    erro_banco = str(e)
-
-if erro_banco:
-    st.error(f"Erro ao carregar banco de dados: {erro_banco}")
-
-# --- INDICADORES GRÁFICOS ---
-st.write("---")
-st.subheader("📊 Gráfico de Monitoramento de Status")
-
-status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
-if acoes:
-    for a in acoes:
-        status_atual = a['status']
-        if status_atual in status_contagem:
-            status_contagem[status_atual] += 1
-
-df_grafico = pd.DataFrame(list(status_contagem.items()), columns=["Status", "Quantidade"])
-st.bar_chart(df_grafico, x="Status", y="Quantidade", color="#1f77b4")
-
-if acoes:
-    pdf_data = gerar_pdf(acoes)
-    st.download_button(
-        label="📄 Gerar e Baixar PDF",
-        data=pdf_data,
-        file_name="Plano_Lavo_Levo.pdf",
-        mime="application/pdf",
-        key="btn_download_pdf"
-    )
-
-# --- LISTAGEM DOS ITENS SALVOS ---
-st.write("---")
-st.subheader("📋 Ações Registradas")
-
-if acoes:
-    df_tabela = pd.DataFrame(acoes)
-    df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status"]
-    st.dataframe(df_tabela, use_container_width=True, hide_index=True)
-    
-    st.write("**Ações de Gerenciamento:**")
-    col_sel, col_btn_ed, col_btn_ex = st.columns(3)
-    
-    with col_sel:
-        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_manutencao")
-    
-    with col_btn_ed:
-        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item"):
-            item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
-            if item_procurado:
-                st.session_state['edit_item'] = item_procurado
-                st.rerun()
-                
-    with col_btn_ex:
-        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item"):
-            try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM Acoes WHERE id_acao = ?", (id_selecionado,))
                 conn.commit()
                 conn.close()
-                st.success(f"Ação ID #{id_selecionado} excluída com sucesso!")
-                if st.session_state['edit_item'] and st.session_state['edit_item']['id_acao'] == id_selecionado:
-                    st.session_state['edit_item'] = None
+                return True
+    except Exception as e:
+        st.error(f"Erro no banco: {e}")
+        return None
+
+# --- VERIFICAÇÃO AUTOMÁTICA DA COLUNA 'COMO' ---
+if 'coluna_verificada' not in st.session_state:
+    check_sql = "SHOW COLUMNS FROM Acoes LIKE 'como'"
+    coluna_existe = executar_db(check_sql)
+    if not coluna_existe:
+        alter_sql = "ALTER TABLE Acoes ADD COLUMN como TEXT AFTER porque"
+        executar_db(alter_sql, retorno=False)
+    st.session_state['coluna_verificada'] = True
+
+# 3. CONTROLE DE SESSÃO
+if 'logado' not in st.session_state: st.session_state['logado'] = False
+if 'edit_id' not in st.session_state: st.session_state.edit_id = None
+if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_excluir = None
+
+# --- LOGIN ---
+if not st.session_state['logado']:
+    st.markdown("<h2 style='text-align: center;'>🧺 Lavanderia Lavo e Levo</h2>", unsafe_allow_html=True)
+    with st.form("login_form"):
+        u, s = st.text_input("Usuário"), st.text_input("Senha", type="password")
+        if st.form_submit_button("Entrar no Sistema"):
+            res = executar_db("SELECT * FROM Credenciais WHERE usuario=%s AND senha=%s", (u, s))
+            if res:
+                if isinstance(res, list) and len(res) > 0:
+                    nivel_usuario = res[0].get('nivel', 'Comum')
+                else:
+                    nivel_usuario = 'Comum'
+                st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                 st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao excluir: {e}")
-else:
-    st.info("Nenhuma ação cadastrada no sistema local até o momento.")
+            else:
+                st.error("Dados de acesso incorretos.")
+    st.stop()
 
-st.write("---")
+# --- CARREGAR DADOS ---
+@st.cache_data(ttl=10)
+def buscar_dados():
+    return executar_db("SELECT A.*, U.nome as quem FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
 
-# --- CONFIGURAÇÃO DE VALORES PADRÃO ---
-valores_padrao = {
-    "id": "", "descricao": "", "porque": "", "onde": "", 
-    "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None
-}
+dados_db = buscar_dados()
+df = pd.DataFrame(dados_db) if dados_db else pd.DataFrame()
+hoje = date.today()
 
-if st.session_state['edit_item']:
-    item = st.session_state['edit_item']
-    valores_padrao = {
-        "id": str(item['id_acao']),
-        "descricao": str(item['descricao_acao']),
-        "porque": str(item['porque']) if item['porque'] else "",
-        "onde": str(item['onde']) if item['onde'] else "",
-        "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
-        "como": str(item['como']) if item['como'] else "",
-        "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
-        "status": str(item['status']),
-        "prazo": item['prazo']
-    }
-    st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
-    
-    if st.button("❌ Cancelar Modo Edição e Voltar ao Novo Cadastro", use_container_width=True, key="btn_cancelar_edicao"):
-        st.session_state['edit_item'] = None
+# --- TITULO PERSONALIZADO ---
+st.markdown("""
+    <h1 style='text-align: center; color: #1E3A8A; padding-bottom: 5px;'>
+        🧺 PLANO ESTRATÉGICO DA LAVANDERIA LAVO E LEVO
+    </h1>
+    <p style='text-align: center; color: #6B7280; font-size: 1.1em;'>Gestão 5W2H e Controle de Performance</p>
+    <hr style='border: 1px solid #3B82F6; margin-bottom: 30px;'>
+""", unsafe_allow_html=True)
+
+# --- ABAS ---
+tab_lista, tab_graficos = st.tabs(["📝 Lançamentos e Controle", "📊 Análise de Performance"])
+
+with tab_lista:
+    # BOTÃO DE ATALHO PARA CRIAR NOVO ITEM
+    c_btn, _ = st.columns([0.2, 0.8])
+    if c_btn.button("➕ Nova Ação (Limpar)", use_container_width=True):
+        st.session_state.edit_id = None
         st.rerun()
 
-# --- PAINEL OPERACIONAL DIRETO ---
-st.subheader("Painel: Registrar Informações")
+    # FORMULÁRIO (CADASTRO / EDIÇÃO)
+    dados_edit = None
+    if st.session_state.edit_id:
+        res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=%s", (st.session_state.edit_id,))
+        if res_e and isinstance(res_e, list) and len(res_e) > 0: 
+            dados_edit = res_e[0]
 
-id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id")
-descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"], key="input_desc")
-porque = st.text_input("Por que", value=valores_padrao["porque"], key="input_porque")
-onde = st.text_input("Onde", value=valores_padrao["onde"], key="input_onde")
-responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"], key="input_resp")
+    with st.expander("📝 Formulário 5W2H", expanded=(st.session_state.edit_id is not None)):
+        res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
+        dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
+        
+        with st.form("form_5w2h", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1:
+                what = st.text_input("What (O que?)", value=dados_edit['descricao_acao'] if dados_edit else "")
+                why = st.text_area("Why (Por que?)", value=dados_edit['porque'] if dados_edit else "")
+                how = st.text_area("How (Como?)", value=dados_edit['como'] if dados_edit and 'como' in dados_edit else "")
+                prio = st.select_slider("Prioridade", options=["Baixa", "Média", "Alta"], value=dados_edit['prioridade'] if dados_edit else "Média")
+            with c2:
+                nome_padrao = "Selecione"
+                if dados_edit:
+                    for nome_u, id_u in dict_u.items():
+                        if id_u == dados_edit['id_responsavel']:
+                            nome_padrao = nome_u
+                
+                lista_usuarios = list(dict_u.keys())
+                index_u = lista_usuarios.index(nome_padrao) if nome_padrao in lista_usuarios else 0
+                
+                who = st.selectbox("Who (Quem?)", lista_usuarios, index=index_u)
+                when = st.date_input("When (Prazo)", dados_edit['prazo'] if dados_edit else date.today(), format="DD/MM/YYYY")
+                cost = st.number_input("How Much (Custo R$)", value=float(dados_edit['quanto_custa'] or 0) if dados_edit else 0.0)
+                
+                status_opcoes = ["Em análise", "Em andamento", "Concluído"]
+                status_index = status_opcoes.index(dados_edit['status']) if dados_edit and dados_edit['status'] in status_opcoes else 0
+                status = st.selectbox("Status", status_opcoes, index=status_index)
+                
+                obs = st.text_input("Observações", value=dados_edit['observacoes'] if dados_edit else "")
 
-prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
-prazo = st.date_input("Prazo *", value=prazo_val, key="input_prazo")
+            if st.form_submit_button("💾 Salvar Plano de Ação"):
+                if st.session_state.edit_id:
+                    sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, como=%s, id_responsavel=%s, prazo=%s, quanto_custa=%s, status=%s, prioridade=%s, observacoes=%s WHERE id_acao=%s"
+                    executar_db(sql, (what, why, how, dict_u[who], when, cost, status, prio, obs, st.session_state.edit_id), False)
+                    st.session_state.edit_id = None
+                else:
+                    sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                    executar_db(sql, (what, why, how, dict_u[who], when, cost, status, prio, obs), False)
+                st.cache_data.clear()
+                st.rerun()
+        
+        if st.session_state.edit_id: 
+            if st.button("❌ Cancelar Edição"):
+                st.session_state.edit_id = None
+                st.rerun()
 
+    # FILTROS DE LISTAGEM ISOLADOS
+    st.subheader("📋 Ações e Prazos")
+    df_filtrado = df.copy()
+    
+    if not df.empty:
+        f1, f2 = st.columns(2)
+        with f1:
+            filtro_quem = st.multiselect("Filtrar por Responsável", options=list(df['quem'].unique()), default=[])
+        with f2:
+            filtro_status = st.multiselect("Filtrar por Status", options=list(df['status'].unique()), default=[])
+        
+        if filtro_quem:
+            df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)]
+        if filtro_status:
+            df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
+
+    # EXIBIÇÃO EM LISTA CARD POR CARD (Integrado com seu layout original)
+    if not df_filtrado.empty:
+        for _, row in df_filtrado.iterrows():
+            dt_br = pd.to_datetime(row['prazo']).strftime('%d/%m/%Y')
+            atraso = pd.to_datetime(row['prazo']).date() < hoje and row['status'] != 'Concluído'
+            cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
+            
+            with st.container():
+                c1, c2, c3, c4 = st.columns([0.02, 0.78, 0.1, 0.1])
+                c1.markdown(f"<div style='background-color:{cor}; height:95px; width:8px; border-radius:5px'></div>", unsafe_allow_html=True)
+                with c2:
+                    st.write(f"**{row['descricao_acao']}** | {row['quem']} | **{dt_br}**")
+                    if 'como' in row and row['como']:
+                        st.caption(f"🔧 **Como:** {row['como']}")
+                    st.caption(f"Status: {row['status']} | Prioridade: {row['prioridade']} | R$ {float(row['quanto_custa'] or 0):,.2f}")
+                    if row['observacoes']: st.info(f"💬 {row['observacoes']}")
+                
+                if c3.button("✏️", key=f"ed_{row['id_acao']}"):
+                    st.session_state.edit_id = row['id_acao']
+                    st.rerun()
+                
+                if c4.button("🗑️", key=f"btn_ex_{row['id_acao']}"):
+                    st.session_state.confirmar_excluir = row['id_acao']
+                
+                if st.session_state.confirmar_excluir == row['id_acao']:
+                    st.warning(f"Excluir item {row['id_acao']}?")
+                    ca, cb = st.columns(2)
+                    if ca.button("✅ SIM", key=f"sim_{row['id_acao']}"):
+                        executar_db("DELETE FROM Acoes WHERE id_acao=%s", (row['id_acao'],), False)
+                        st.session_state.confirmar_excluir = None
+                        st.cache_data.clear()
+                        st.rerun()
+                    if cb.button("❌ NÃO", key=f"nao_{row['id_acao']}"):
+                        st.session_state.confirmar_excluir = None
+                        st.rerun()
+                st.divider()
+    else:
+        st.info("Nenhuma ação cadastrada ou correspondente aos filtros.")
+
+# --- ABA DE GRÁFICOS COMPLETA ---
+with tab_graficos:
