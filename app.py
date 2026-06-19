@@ -228,7 +228,6 @@ if st.session_state['edit_item']:
     }
     st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
     
-    # Botão de Cancelar colocado de FORA do formulário para evitar erros de indentação
     if st.button("❌ Cancelar Modo Edição e Voltar ao Novo Cadastro", use_container_width=True):
         st.session_state['edit_item'] = None
         st.rerun()
@@ -252,3 +251,4 @@ with st.form("form_acao", clear_on_submit=False):
     index_status = lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0
     status = st.selectbox("Status", lista_status, index=index_status)
     
+    # O botão obrigatoriamente deve fechar o contexto do formulário (with)
