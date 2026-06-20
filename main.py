@@ -1,4 +1,4 @@
-import streamlit st
+import streamlit as st
 import sqlite3
 import pandas as pd
 import plotly.express as px
@@ -103,7 +103,6 @@ if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_exclu
 
 # --- TELA DE LOGIN ---
 if not st.session_state['logado']:
-    # CORREÇÃO CRUCIAL: Parâmetro numérico adicionado para estruturar o layout em 3 colunas
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
         try:
@@ -228,3 +227,5 @@ if not df.empty:
     filtro_status = f2.multiselect("Filtrar por Status", options=list(df['status'].unique()), default=[])
     
     df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)] if filtro_quem else df_filtrado
+    df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)] if filtro_status else df_filtrado
+
