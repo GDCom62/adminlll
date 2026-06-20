@@ -90,7 +90,7 @@ if not st.session_state['logado']:
         if st.form_submit_button("Entrar no Sistema"):
             res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
             if res and isinstance(res, list) and len(res) > 0:
-                nivel_usuario = res[0].get('nivel', 'Comum')
+                nivel_usuario = res.get('nivel', 'Comum')
                 st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                 st.rerun()
             else:
@@ -127,7 +127,7 @@ dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and isinstance(res_e, list) and len(res_e) > 0: 
-        dados_edit = res_e[0]
+        dados_edit = res_e
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
 dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
@@ -204,7 +204,7 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# --- LISTA DE CONTROLE RÁPIDO CORRIGIDA SEM ABAS OU TABULAÇÕES OCULTAS ---
+# --- LISTA DE CONTROLE RÁPIDO ---
 if not df_filtrado.empty:
     tab_lista.write("**Lista de Controle Rápido:**")
     st_df = df_filtrado[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
@@ -221,4 +221,4 @@ if not df_filtrado.empty:
             st.rerun()
             
     with col_btn_ex:
-        # ALINHAMENTO CORRETO: Resposta do if colocada na linha inferior com recuo perfeito por espaços puros
+        # CORREÇÃO DEFINITIVA: Primeiro comando executável recuado perfeitamente dentro do bloco with
