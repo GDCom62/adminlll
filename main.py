@@ -27,7 +27,7 @@ st.markdown("""
     <img src="app/static/logo1.png" class="footer-logo" onerror="this.style.display='none'">
 """, unsafe_allow_html=True)
 
-# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
+# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE (Base que estava salvando)
 def executar_db(sql, params=None, retorno=True):
     try:
         conn = sqlite3.connect("banco_lavo_levo_estavel.db")
@@ -90,6 +90,7 @@ def inicializar_banco_local():
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Equipe Lavo e Levo",), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Gerência",), retorno=False)
 
+    # Adiciona o novo responsável Administrativo solicitado se ele não existir
     check_adm = executar_db("SELECT * FROM Usuarios WHERE nome = ?", ("Administrativo",))
     if not check_adm:
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Administrativo",), retorno=False)
@@ -109,7 +110,6 @@ if not st.session_state['logado']:
             st.image("logo.png", use_container_width=True)
         except Exception:
             st.markdown("<h2 style='text-align: center;'>🧺 Lavanderia Lavo e Levo</h2>", unsafe_allow_html=True)
-            st.caption("📷 *[Insira o arquivo logo.png no seu GitHub para exibir a imagem aqui]*")
         
         with st.form("login_form"):
             st.markdown("<h3 style='text-align: center; color: #1E3A8A;'>Acesso ao Sistema</h3>", unsafe_allow_html=True)
@@ -118,7 +118,6 @@ if not st.session_state['logado']:
             if st.form_submit_button("Entrar no Sistema", use_container_width=True):
                 res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
                 if res and len(res) > 0:
-                    # CORREÇÃO CRUCIAL DO LOGIN PARA EVITAR TRAVAMENTOS NO PYTHON 3.14
                     nivel_usuario = res[0]['nivel'] if 'nivel' in res[0] else 'Comum'
                     st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                     st.rerun()
@@ -156,7 +155,6 @@ dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and len(res_e) > 0: 
-        # CORREÇÃO CRUCIAL DA EDIÇÃO PARA EVITAR TRAVAMENTOS NO PYTHON 3.14
         dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
@@ -228,4 +226,10 @@ if not df.empty:
     filtro_quem = f1.multiselect("Filtrar por Responsável", options=list(df['quem'].unique()), default=[])
     filtro_status = f2.multiselect("Filtrar por Status", options=list(df['status'].unique()), default=[])
     
-    df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)] if filtro_quem else df_filtrado
+    if filtro_quem:
+        df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)]
+    if filtro_status:
+        df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
+
+# --- LISTA DE CONTROLE RÁPIDO ---
+if not df_filtrado.empty:
