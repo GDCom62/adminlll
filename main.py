@@ -1,5 +1,5 @@
 import streamlit as st
-import pymysql
+import sqlite3
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, date
@@ -8,45 +8,74 @@ import io
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 
-# 2. FUNÇÃO DE CONEXÃO BLINDADA CONTRA ERROS DE DIGITAÇÃO/CACHE
+# 2. FUNÇÃO DE CONEXÃO LOCAL COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
-        # Puxa o host dos secrets e limpa qualquer prefixo invisível de URL (como ://)
-        host_config = str(st.secrets["DB_HOST"]).strip()
-        host_limpo = host_config.replace("https://", "").replace("http://", "").replace("://", "").strip()
+        conn = sqlite3.connect("banco_lavo_levo.db")
+        conn.row_factory = sqlite3.Row  # Faz retornar como se fosse o DictCursor do pymysql
+        cursor = conn.cursor()
         
-        conn = pymysql.connect(
-            host=host_limpo,
-            user=str(st.secrets["DB_USER"]).strip(),
-            password=str(st.secrets["DB_PASSWORD"]).strip(),
-            database=str(st.secrets["DB_NAME"]).strip(),
-            port=int(st.secrets["DB_PORT"]),
-            ssl={'ssl': {}},
-            cursorclass=pymysql.cursors.DictCursor,
-            connect_timeout=10
-        )
-        with conn.cursor() as cursor:
-            cursor.execute(sql, params or ())
-            if retorno:
-                resultado = cursor.fetchall()
-                conn.close()
-                return resultado
-            else:
-                conn.commit()
-                conn.close()
-                return True
+        # Converte a sintaxe de placeholders do MySQL (%s) para SQLite (?)
+        sql_convertido = sql.replace("%s", "?")
+        
+        cursor.execute(sql_convertido, params or ())
+        if retorno:
+            resultado = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            return resultado
+        else:
+            conn.commit()
+            conn.close()
+            return True
     except Exception as e:
         st.error(f"Erro no banco: {e}")
         return None
 
-# --- VERIFICAÇÃO AUTOMÁTICA DA COLUNA 'COMO' ---
-if 'coluna_verificada' not in st.session_state:
-    check_sql = "SHOW COLUMNS FROM Acoes LIKE 'como'"
-    coluna_existe = executar_db(check_sql)
-    if not coluna_existe:
-        alter_sql = "ALTER TABLE Acoes ADD COLUMN como TEXT AFTER porque"
-        executar_db(alter_sql, retorno=False)
-    st.session_state['coluna_verificada'] = True
+# --- INICIALIZAÇÃO DA ESTRUTURA LOCAL DO BANCO (Caso não exista) ---
+def inicializar_banco_local():
+    # Tabela de Credenciais
+    executar_db("""
+        CREATE TABLE IF NOT EXISTS Credenciais (
+            id_credencial INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario TEXT NOT NULL,
+            senha TEXT NOT NULL,
+            nivel TEXT DEFAULT 'Comum'
+        )
+    """, retorno=False)
+    
+    # Tabela de Usuários/Responsáveis
+    executar_db("""
+        CREATE TABLE IF NOT EXISTS Usuarios (
+            id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL
+        )
+    """, retorno=False)
+    
+    # Tabela de Ações (5W2H)
+    executar_db("""
+        CREATE TABLE IF NOT EXISTS Acoes (
+            id_acao INTEGER PRIMARY KEY AUTOINCREMENT,
+            descricao_acao TEXT NOT NULL,
+            porque TEXT,
+            como TEXT,
+            id_responsavel INTEGER,
+            prazo TEXT,
+            quanto_custa REAL DEFAULT 0.0,
+            status TEXT DEFAULT 'Em análise',
+            prioridade TEXT DEFAULT 'Média',
+            observacoes TEXT
+        )
+    """, retorno=False)
+
+    # Inserção de dados padrão de teste se o banco estiver vazio
+    usuarios_existentes = executar_db("SELECT * FROM Usuarios")
+    if not usuarios_existentes:
+        executar_db("INSERT INTO Credenciais (usuario, senha, nivel) VALUES (?, ?, ?)", ("admin", "123", "Administrador"), retorno=False)
+        executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Equipe Lavo e Levo",), retorno=False)
+        executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Gerência",), retorno=False)
+
+# Roda a inicialização automática do banco SQLite local
+inicializar_banco_local()
 
 # 3. CONTROLE DE SESSÃO
 if 'logado' not in st.session_state: st.session_state['logado'] = False
@@ -57,14 +86,11 @@ if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_exclu
 if not st.session_state['logado']:
     st.markdown("<h2 style='text-align: center;'>🧺 Lavanderia Lavo e Levo</h2>", unsafe_allow_html=True)
     with st.form("login_form"):
-        u, s = st.text_input("Usuário"), st.text_input("Senha", type="password")
+        u, s = st.text_input("Usuário (Padrão: admin)"), st.text_input("Senha (Padrão: 123)", type="password")
         if st.form_submit_button("Entrar no Sistema"):
-            res = executar_db("SELECT * FROM Credenciais WHERE usuario=%s AND senha=%s", (u, s))
+            res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
             if res:
-                if isinstance(res, list) and len(res) > 0:
-                    nivel_usuario = res[0].get('nivel', 'Comum')
-                else:
-                    nivel_usuario = 'Comum'
+                nivel_usuario = res[0].get('nivel', 'Comum')
                 st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                 st.rerun()
             else:
@@ -72,7 +98,7 @@ if not st.session_state['logado']:
     st.stop()
 
 # --- CARREGAR DADOS ---
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=5)
 def buscar_dados():
     return executar_db("SELECT A.*, U.nome as quem FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
 
@@ -104,7 +130,7 @@ if tab_lista.button("➕ Nova Ação (Limpar)", use_container_width=True):
 # FORMULÁRIO (CADASTRO / EDIÇÃO)
 dados_edit = None
 if st.session_state.edit_id:
-    res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=%s", (st.session_state.edit_id,))
+    res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and isinstance(res_e, list) and len(res_e) > 0: 
         dados_edit = res_e[0]
 
@@ -131,7 +157,15 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
         index_u = lista_usuarios.index(nome_padrao) if nome_padrao in lista_usuarios else 0
         
         who = st.selectbox("Who (Quem?)", lista_usuarios, index=index_u)
-        when = st.date_input("When (Prazo)", dados_edit['prazo'] if dados_edit else date.today(), format="DD/MM/YYYY")
+        
+        prazo_inicial = date.today()
+        if dados_edit and dados_edit['prazo']:
+            try:
+                prazo_inicial = datetime.strptime(dados_edit['prazo'], '%Y-%m-%d').date()
+            except:
+                prazo_inicial = date.today()
+                
+        when = st.date_input("When (Prazo)", prazo_inicial, format="DD/MM/YYYY")
         cost = st.number_input("How Much (Custo R$)", value=float(dados_edit['quanto_custa'] or 0) if dados_edit else 0.0)
         
         status_opcoes = ["Em análise", "Em andamento", "Concluído"]
@@ -142,14 +176,12 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
 
     if st.form_submit_button("💾 Salvar Plano de Ação"):
         if st.session_state.edit_id:
-            sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, como=%s, id_responsavel=%s, prazo=%s, quanto_custa=%s, status=%s, prioridade=%s, observacoes=%s WHERE id_acao=%s"
-            executar_db(sql, (what, why, how, dict_u[who], when, cost, status, prio, obs, st.session_state.edit_id), False)
+            sql = "UPDATE Acoes SET descricao_acao=?, porque=?, como=?, id_responsavel=?, prazo=?, quanto_custa=?, status=?, prioridade=?, observacoes=? WHERE id_acao=?"
+            executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs, st.session_state.edit_id), False)
             st.session_state.edit_id = None
         else:
-            sql = "INSERT INTO Acoes (descricao_acao, because, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-            # Proteção caso a coluna seja descrita de forma diferente
-            sql = sql.replace("because", "porque")
-            executar_db(sql, (what, why, how, dict_u[who], when, cost, status, prio, obs), False)
+            sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
+            executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
         st.cache_data.clear()
         st.rerun()
 
@@ -172,11 +204,17 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# EXIBIÇÃO EM LISTA CARD POR CARD
+# EXIBIÇÃO EM LISTA CARD POR CARD (Layout Original Restaurado)
 if not df_filtrado.empty:
     for _, row in df_filtrado.iterrows():
-        dt_br = pd.to_datetime(row['prazo']).strftime('%d/%m/%Y')
-        atraso = pd.to_datetime(row['prazo']).date() < hoje and row['status'] != 'Concluído'
+        try:
+            dt_br = datetime.strptime(row['prazo'], '%Y-%m-%d').strftime('%d/%m/%Y')
+            data_prazo = datetime.strptime(row['prazo'], '%Y-%m-%d').date()
+        except:
+            dt_br = str(row['prazo'])
+            data_prazo = hoje
+            
+        atraso = data_prazo < hoje and row['status'] != 'Concluído'
         cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
         
         card_container = tab_lista.container()
@@ -188,30 +226,3 @@ if not df_filtrado.empty:
             c2.caption(f"🔧 **Como:** {row['como']}")
         c2.caption(f"Status: {row['status']} | Prioridade: {row['prioridade']} | R$ {float(row['quanto_custa'] or 0):,.2f}")
         if row['observacoes']: 
-            c2.info(f"💬 {row['observacoes']}")
-        
-        if c3.button("✏️", key=f"ed_{row['id_acao']}"):
-            st.session_state.edit_id = row['id_acao']
-            st.rerun()
-        
-        if c4.button("🗑️", key=f"btn_ex_{row['id_acao']}"):
-            st.session_state.confirmar_excluir = row['id_acao']
-            st.rerun()
-        
-        if st.session_state.confirmar_excluir == row['id_acao']:
-            card_container.warning(f"Excluir item {row['id_acao']}?")
-            ca, cb = card_container.columns(2)
-            if ca.button("✅ SIM", key=f"sim_{row['id_acao']}"):
-                executar_db("DELETE FROM Acoes WHERE id_acao=%s", (row['id_acao'],), False)
-                st.session_state.confirmar_excluir = None
-                st.cache_data.clear()
-                st.rerun()
-            if cb.button("❌ NÃO", key=f"nao_{row['id_acao']}"):
-                st.session_state.confirmar_excluir = None
-                st.rerun()
-        card_container.divider()
-else:
-    tab_lista.info("Nenhuma ação cadastrada ou correspondente aos filtros.")
-
-
-# ==============================================================================
