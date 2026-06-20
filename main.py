@@ -90,7 +90,7 @@ if not st.session_state['logado']:
         if st.form_submit_button("Entrar no Sistema"):
             res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
             if res and isinstance(res, list) and len(res) > 0:
-                nivel_usuario = res[0].get('nivel', 'Comum')
+                nivel_usuario = res.get('nivel', 'Comum')
                 st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                 st.rerun()
             else:
@@ -127,7 +127,7 @@ dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and isinstance(res_e, list) and len(res_e) > 0: 
-        dados_edit = res_e[0]
+        dados_edit = res_e
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
 dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
@@ -218,5 +218,5 @@ if not df_filtrado.empty:
             st.session_state.edit_id = id_selecionado
             st.rerun()
     with col_btn_ex:
-        # CORREÇÃO: Alinhamento seguro com 4 espaços internos do bloco with
+        # CORREÇÃO: Alinhamento das duas linhas executadas dentro do botão excluir
         if st.button("🗑️ Excluir ID Selecionado", use_container_width=True, key="btn_tabela_excluir"):
