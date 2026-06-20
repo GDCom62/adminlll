@@ -27,10 +27,9 @@ st.markdown("""
     <img src="app/static/logo1.png" class="footer-logo" onerror="this.style.display='none'">
 """, unsafe_allow_html=True)
 
-# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE (ORDEM CORRIGIDA)
+# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
-        # Mantém a pasta estável do servidor da nuvem
         conn = sqlite3.connect("/tmp/banco_lavo_levo_estavel.db")
         conn.row_factory = sqlite3.Row  
         cursor = conn.cursor()
@@ -44,7 +43,6 @@ def executar_db(sql, params=None, retorno=True):
             conn.close()
             return resultado
         else:
-            # CORREÇÃO DEFINITIVA: O commit DEVE rodar com o cursor ainda aberto para o SQLite aceitar a gravação
             conn.commit()
             cursor.close()
             conn.close()
@@ -94,7 +92,7 @@ def inicializar_banco_local():
 
     check_adm = executar_db("SELECT * FROM Usuarios WHERE nome = ?", ("Administrativo",))
     if not check_adm:
-        executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Administrativo",), refinement_fake=True, retorno=False)
+        executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Administrativo",), retorno=False)
 
 inicializar_banco_local()
 
@@ -105,7 +103,7 @@ if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_exclu
 
 # --- TELA DE LOGIN ---
 if not st.session_state['logado']:
-    col_l1, col_l2, col_l3 = st.columns([1,2,1])
+    col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
     with col_l2:
         try:
             st.image("logo.png", use_container_width=True)
@@ -228,4 +226,7 @@ if not df.empty:
     filtro_quem = f1.multiselect("Filtrar por Responsável", options=list(df['quem'].unique()), default=[])
     filtro_status = f2.multiselect("Filtrar por Status", options=list(df['status'].unique()), default=[])
     
+    # CORREÇÃO CRUCIAL DA INDENTAÇÃO DAS LINHAS 231 A 234
     if filtro_quem:
+        df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)]
+    if filtro_status:
