@@ -89,7 +89,7 @@ st.markdown("""
 tab_lista, tab_graficos = st.tabs(["📝 Lançamentos e Controle", "📊 Análise de Performance"])
 
 # ==============================================================================
-# 📝 CONTEÚDO DA ABA 1: LANÇAMENTOS E CONTROLE (SEM USO DE 'WITH')
+# 📝 CONTEÚDO DA ABA 1: LANÇAMENTOS E CONTROLE
 # ==============================================================================
 
 # BOTÃO DE ATALHO PARA CRIAR NOVO ITEM
@@ -107,7 +107,6 @@ if st.session_state.edit_id:
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
 dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
 
-# Criamos o expander diretamente associado à tab_lista
 form_expander = tab_lista.expander("📝 Formulário 5W2H", expanded=(st.session_state.edit_id is not None))
 
 with form_expander.form("form_5w2h", clear_on_submit=True):
@@ -210,7 +209,7 @@ else:
 
 
 # ==============================================================================
-# 📊 CONTEÚDO DA ABA 2: ANÁLISE DE PERFORMANCE (SEM USO DE 'WITH')
+# 📊 CONTEÚDO DA ABA 2: ANÁLISE DE PERFORMANCE
 # ==============================================================================
 
 if df.empty:
