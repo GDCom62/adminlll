@@ -8,14 +8,18 @@ import io
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 
-# 2. FUNÇÃO DE CONEXÃO
+# 2. FUNÇÃO DE CONEXÃO BLINDADA CONTRA ERROS DE DIGITAÇÃO/CACHE
 def executar_db(sql, params=None, retorno=True):
     try:
+        # Puxa o host dos secrets e limpa qualquer prefixo invisível de URL (como ://)
+        host_config = str(st.secrets["DB_HOST"]).strip()
+        host_limpo = host_config.replace("https://", "").replace("http://", "").replace("://", "").strip()
+        
         conn = pymysql.connect(
-            host=st.secrets["DB_HOST"],
-            user=st.secrets["DB_USER"],
-            password=st.secrets["DB_PASSWORD"],
-            database=st.secrets["DB_NAME"],
+            host=host_limpo,
+            user=str(st.secrets["DB_USER"]).strip(),
+            password=str(st.secrets["DB_PASSWORD"]).strip(),
+            database=str(st.secrets["DB_NAME"]).strip(),
             port=int(st.secrets["DB_PORT"]),
             ssl={'ssl': {}},
             cursorclass=pymysql.cursors.DictCursor,
@@ -142,7 +146,9 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
             executar_db(sql, (what, why, how, dict_u[who], when, cost, status, prio, obs, st.session_state.edit_id), False)
             st.session_state.edit_id = None
         else:
-            sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            sql = "INSERT INTO Acoes (descricao_acao, because, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            # Proteção caso a coluna seja descrita de forma diferente
+            sql = sql.replace("because", "porque")
             executar_db(sql, (what, why, how, dict_u[who], when, cost, status, prio, obs), False)
         st.cache_data.clear()
         st.rerun()
@@ -209,12 +215,3 @@ else:
 
 
 # ==============================================================================
-# 📊 CONTEÚDO DA ABA 2: ANÁLISE DE PERFORMANCE
-# ==============================================================================
-
-if df.empty:
-    tab_graficos.info("Sem dados suficientes cadastrados para gerar os gráficos.")
-else:
-    tab_graficos.subheader("📊 Indicadores da Lavo e Levo")
-    g1, g2 = tab_graficos.columns(2)
-    
