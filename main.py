@@ -8,10 +8,10 @@ import io
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 
-# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE (CORRIGIDA)
+# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
-        # Caminho fixo na pasta protegida do servidor, imune a atualizações do GitHub
+        # Caminho fixo imune a atualizações e resets do GitHub
         conn = sqlite3.connect("/tmp/banco_lavo_levo_estavel.db")
         conn.row_factory = sqlite3.Row  
         cursor = conn.cursor()
@@ -22,10 +22,11 @@ def executar_db(sql, params=None, retorno=True):
         cursor.execute(sql_convertido, params or ())
         if retorno:
             resultado = [dict(row) for row in cursor.fetchall()]
+            cursor.close()
             conn.close()
             return resultado
         else:
-            # CORREÇÃO CRUCIAL: Commit precisa rodar ANTES de fechar a conexão
+            # Força a gravação física imediata dos dados de INSERT/UPDATE
             conn.commit()
             cursor.close()
             conn.close()
@@ -100,8 +101,7 @@ if not st.session_state['logado']:
                 st.error("Dados de acesso incorretos.")
     st.stop()
 
-# --- CARREGAR DADOS ---
-@st.cache_data(ttl=5)
+# --- CARREGAR DADOS EM TEMPO REAL (Sem cache travando a tela) ---
 def buscar_dados():
     return executar_db("SELECT A.*, U.nome as quem FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
 
@@ -133,6 +133,7 @@ dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and isinstance(res_e, list) and len(res_e) > 0: 
+        # CORREÇÃO DA LEITURA DE EDIÇÃO: Extrai corretamente o dicionário da linha zero
         dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
@@ -188,7 +189,6 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
             else:
                 sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
                 executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
-            st.cache_data.clear()
             st.rerun()
 
 if st.session_state.edit_id: 
@@ -224,4 +224,3 @@ if not df_filtrado.empty:
         cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
         
         card_container = tab_lista.container()
-        c1, c2, c3, c4 = card_container.columns([0.02, 0.78, 0.1, 0.1])
