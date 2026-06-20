@@ -8,6 +8,25 @@ import io
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 
+# Estilização em CSS para fixar o logo1.png no rodapé direito inferior da tela
+st.markdown("""
+    <style>
+    .footer-logo {
+        position: fixed;
+        bottom: 15px;
+        right: 15px;
+        width: 120px;
+        z-index: 9999;
+        opacity: 0.85;
+        transition: opacity 0.3s;
+    }
+    .footer-logo:hover {
+        opacity: 1;
+    }
+    </style>
+    <img src="app/static/logo1.png" class="footer-logo" onerror="this.style.display='none'">
+""", unsafe_allow_html=True)
+
 # 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
@@ -82,19 +101,29 @@ if 'logado' not in st.session_state: st.session_state['logado'] = False
 if 'edit_id' not in st.session_state: st.session_state.edit_id = None
 if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_excluir = None
 
-# --- LOGIN ---
+# --- TELA DE LOGIN ---
 if not st.session_state['logado']:
-    st.markdown("<h2 style='text-align: center;'>🧺 Lavanderia Lavo e Levo</h2>", unsafe_allow_html=True)
-    with st.form("login_form"):
-        u, s = st.text_input("Usuário"), st.text_input("Senha", type="password")
-        if st.form_submit_button("Entrar no Sistema"):
-            res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
-            if res and isinstance(res, list) and len(res) > 0:
-                nivel_usuario = res[0].get('nivel', 'Comum')
-                st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
-                st.rerun()
-            else:
-                st.error("Dados de acesso incorretos.")
+    col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
+    with col_l2:
+        # Tenta carregar a imagem do logo centralizado na entrada
+        try:
+            st.image("logo.png", use_container_width=True)
+        except Exception:
+            st.markdown("<h2 style='text-align: center;'>🧺 Lavanderia Lavo e Levo</h2>", unsafe_allow_html=True)
+            st.caption("📷 *[Insira o arquivo logo.png no seu GitHub para exibir a imagem aqui]*")
+        
+        with st.form("login_form"):
+            st.markdown("<h3 style='text-align: center; color: #1E3A8A;'>Acesso ao Sistema</h3>", unsafe_allow_html=True)
+            u = st.text_input("Usuário")
+            s = st.text_input("Senha", type="password")
+            if st.form_submit_button("Entrar no Sistema", use_container_width=True):
+                res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
+                if res and isinstance(res, list) and len(res) > 0:
+                    nivel_usuario = res[0].get('nivel', 'Comum')
+                    st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
+                    st.rerun()
+                else:
+                    st.error("Dados de acesso incorretos.")
     st.stop()
 
 # --- CARREGAR DADOS ---
@@ -182,10 +211,14 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
             else:
                 sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
                 executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
-            st.cache_data.clear()
             st.rerun()
 
-# --- FILTROS DE LISTAGEM ISOLADOS ---
+if st.session_state.edit_id: 
+    if form_expander.button("❌ Cancelar Modo Edição", use_container_width=True):
+        st.session_state.edit_id = None
+        st.rerun()
+
+# FILTROS DE LISTAGEM ISOLADOS
 tab_lista.subheader("📋 Ações e Prazos")
 df_filtrado = df.copy()
 
@@ -197,27 +230,3 @@ if not df.empty:
     if filtro_quem:
         df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)]
     if filtro_status:
-        df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
-
-# --- LISTA DE CONTROLE RÁPIDO SÓLIDA ---
-if not df_filtrado.empty:
-    tab_lista.write("**Lista de Controle Rápido:**")
-    st_df = df_filtrado[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
-    tab_lista.dataframe(st_df, use_container_width=True, hide_index=True)
-    
-    col_sel, col_btn_ed, col_btn_ex = tab_lista.columns([0.4, 0.3, 0.3])
-    
-    id_selecionado = col_sel.selectbox("Selecione o ID de uma ação para alterar ou remover:", df_filtrado['id_acao'].tolist(), key="select_manutencao_tabela")
-    
-    # CORREÇÃO DEFINITIVA: Botões chamados de forma plana eliminando blocos 'with' e riscos de recuo
-    if col_btn_ed.button("✏️ Editar ID Selecionado", use_container_width=True, key="btn_tabela_editar"):
-        st.session_state.edit_id = id_selecionado
-        st.rerun()
-        
-    if col_btn_ex.button("🗑️ Excluir ID Selecionado", use_container_width=True, key="btn_tabela_excluir"):
-        executar_db("DELETE FROM Acoes WHERE id_acao=?", (id_selecionado,), False)
-        st.cache_data.clear()
-        st.rerun()
-            
-    tab_lista.write("---")
-
