@@ -8,10 +8,10 @@ import io
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 
-# 2. FUNÇÃO DE CONEXÃO FIXA E PERSISTENTE COM SQLITE
+# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
-        # Usar o caminho /tmp/ garante que o arquivo não seja resetado quando o código mudar no GitHub
+        # Caminho fixo na pasta protegida do servidor, imune a atualizações do GitHub
         conn = sqlite3.connect("/tmp/banco_lavo_levo_estavel.db")
         conn.row_factory = sqlite3.Row  
         cursor = conn.cursor()
@@ -68,14 +68,14 @@ def inicializar_banco_local():
         )
     """, retorno=False)
 
-    # Inserção de dados padrão de segurança
+    # Inserção de dados padrão se o banco local estiver vazio
     usuarios_existentes = executar_db("SELECT * FROM Usuarios")
     if not usuarios_existentes:
         executar_db("INSERT INTO Credenciais (usuario, senha, nivel) VALUES (?, ?, ?)", ("admin", "123", "Administrador"), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Equipe Lavo e Levo",), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Gerência",), retorno=False)
 
-# Inicializa o banco na pasta persistente
+# Inicializa o banco estável
 inicializar_banco_local()
 
 # 3. CONTROLE DE SESSÃO
@@ -131,7 +131,6 @@ dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and isinstance(res_e, list) and len(res_e) > 0: 
-        # CORREÇÃO CRUCIAL DA EDIÇÃO: Lê a linha zero da lista corretamente
         dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
@@ -209,7 +208,7 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# EXIBIÇÃO EM LISTA CARD POR CARD
+# EXIBIÇÃO EM LISTA CARD POR CARD COM OS BOTÕES ATIVOS
 if not df_filtrado.empty:
     for _, row in df_filtrado.iterrows():
         try:
@@ -223,4 +222,6 @@ if not df_filtrado.empty:
         cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
         
         card_container = tab_lista.container()
+        
+        # Criação das colunas do cartão: c3 abriga o botão Editar e c4 abriga o botão Excluir
         c1, c2, c3, c4 = card_container.columns([0.02, 0.78, 0.1, 0.1])
