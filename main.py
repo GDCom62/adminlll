@@ -30,7 +30,7 @@ st.markdown("""
 # 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
-        conn = sqlite3.connect("/tmp/banco_lavo_levo_estavel.db")
+        conn = sqlite3.connect("banco_lavo_levo_estavel.db")
         conn.row_factory = sqlite3.Row  
         cursor = conn.cursor()
         
@@ -96,10 +96,11 @@ def inicializar_banco_local():
 
 inicializar_banco_local()
 
-# 3. CONTROLE DE SESSÃO
+# 3. CONTROLE DE SESSÃO E MEMÓRIA VIVA (Garante atualização instantânea na tela)
 if 'logado' not in st.session_state: st.session_state['logado'] = False
 if 'edit_id' not in st.session_state: st.session_state.edit_id = None
 if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_excluir = None
+if 'dados_atualizados' not in st.session_state: st.session_state.dados_atualizados = True
 
 # --- TELA DE LOGIN ---
 if not st.session_state['logado']:
@@ -118,8 +119,7 @@ if not st.session_state['logado']:
             if st.form_submit_button("Entrar no Sistema", use_container_width=True):
                 res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
                 if res and len(res) > 0:
-                    # CORREÇÃO DEFINITIVA DO LOGIN: Acessa a posição [0] para extrair o dicionário interno
-                    nivel_usuario = res[0].get('nivel', 'Comum')
+                    nivel_usuario = res[0]['nivel'] if 'nivel' in res[0] else 'Comum'
                     st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                     st.rerun()
                 else:
@@ -156,7 +156,6 @@ dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and len(res_e) > 0: 
-        # CORREÇÃO DEFINITIVA DA EDIÇÃO: Captura o dicionário interno usando índice [0]
         dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
@@ -212,6 +211,7 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
             else:
                 sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
                 executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
+            st.session_state.dados_atualizados = True
             st.rerun()
 
 if st.session_state.edit_id: 
