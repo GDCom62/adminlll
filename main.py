@@ -105,7 +105,6 @@ if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_exclu
 if not st.session_state['logado']:
     col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
     with col_l2:
-        # Tenta carregar a imagem do logo centralizado na entrada
         try:
             st.image("logo.png", use_container_width=True)
         except Exception:
@@ -230,3 +229,6 @@ if not df.empty:
     if filtro_quem:
         df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)]
     if filtro_status:
+        df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
+
+# --- LISTA DE CONTROLE RÁPIDO ---
