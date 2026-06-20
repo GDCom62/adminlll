@@ -3,7 +3,6 @@ import sqlite3
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, date
-import io
 
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
@@ -100,7 +99,6 @@ inicializar_banco_local()
 if 'logado' not in st.session_state: st.session_state['logado'] = False
 if 'edit_id' not in st.session_state: st.session_state.edit_id = None
 if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_excluir = None
-if 'reset_contador' not in st.session_state: st.session_state.reset_contador = 0
 
 # --- TELA DE LOGIN ---
 if not st.session_state['logado']:
@@ -118,9 +116,9 @@ if not st.session_state['logado']:
             if st.form_submit_button("Entrar no Sistema", use_container_width=True):
                 res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
                 if res and len(res) > 0:
+                    # CORREÇÃO DEFINITIVA DO LOGIN NO SQLITE
                     nivel_usuario = res[0]['nivel'] if 'nivel' in res[0] else 'Comum'
                     st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
-                    st.session_state.reset_contador += 1
                     st.rerun()
                 else:
                     st.error("Dados de acesso incorretos.")
@@ -150,13 +148,13 @@ tab_lista, tab_graficos = st.tabs(["📝 Lançamentos e Controle", "📊 Anális
 # ==============================================================================
 if tab_lista.button("➕ Nova Ação (Limpar)", use_container_width=True):
     st.session_state.edit_id = None
-    st.session_state.reset_contador += 1
     st.rerun()
 
 dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and len(res_e) > 0: 
+        # CORREÇÃO DEFINITIVA DA LEITURA DE EDIÇÃO NO SQLITE
         dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
@@ -165,7 +163,7 @@ dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
 titulo_formulario = f"📝 Editando Ação #{st.session_state.edit_id}" if st.session_state.edit_id else "📝 Formulário 5W2H"
 form_expander = tab_lista.expander(titulo_formulario, expanded=(st.session_state.edit_id is not None))
 
-with form_expander.form(f"form_5w2h_{st.session_state.reset_contador}", clear_on_submit=True):
+with form_expander.form("form_5w2h", clear_on_submit=True):
     c1, c2 = st.columns(2)
     with c1:
         what = st.text_input("What (O que?) *", value=dados_edit['descricao_acao'] if dados_edit else "")
@@ -212,15 +210,11 @@ with form_expander.form(f"form_5w2h_{st.session_state.reset_contador}", clear_on
             else:
                 sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
                 executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
-            
-            # SOLUÇÃO PARA PYTHON 3.14: Altera o ID do formulário dinamicamente para forçar a tela a atualizar sem depender do st.rerun
-            st.session_state.reset_contador += 1
             st.rerun()
 
 if st.session_state.edit_id: 
     if form_expander.button("❌ Cancelar Modo Edição", use_container_width=True):
         st.session_state.edit_id = None
-        st.session_state.reset_contador += 1
         st.rerun()
 
 # FILTROS DE LISTAGEM ISOLADOS
@@ -230,3 +224,12 @@ df_filtrado = df.copy()
 if not df.empty:
     f1, f2 = tab_lista.columns(2)
     filtro_quem = f1.multiselect("Filtrar por Responsável", options=list(df['quem'].unique()), default=[])
+    filtro_status = f2.multiselect("Filtrar por Status", options=list(df['status'].unique()), default=[])
+    
+    if filtro_quem:
+        df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)]
+    if filtro_status:
+        df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
+
+# --- LISTA DE CONTROLE RÁPIDO ---
+if not df_filtrado.empty:
