@@ -90,7 +90,7 @@ if not st.session_state['logado']:
         if st.form_submit_button("Entrar no Sistema"):
             res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
             if res and isinstance(res, list) and len(res) > 0:
-                nivel_usuario = res.get('nivel', 'Comum')
+                nivel_usuario = res[0].get('nivel', 'Comum')
                 st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                 st.rerun()
             else:
@@ -127,7 +127,7 @@ dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and isinstance(res_e, list) and len(res_e) > 0: 
-        dados_edit = res_e
+        dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
 dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
@@ -185,12 +185,7 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
             st.cache_data.clear()
             st.rerun()
 
-if st.session_state.edit_id: 
-    if form_expander.button("❌ Cancelar Modo Edição", use_container_width=True):
-        st.session_state.edit_id = None
-        st.rerun()
-
-# FILTROS DE LISTAGEM ISOLADOS
+# --- FILTROS DE LISTAGEM ISOLADOS ---
 tab_lista.subheader("📋 Ações e Prazos")
 df_filtrado = df.copy()
 
@@ -204,7 +199,7 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# --- LISTA DE CONTROLE RÁPIDO ---
+# --- LISTA DE CONTROLE RÁPIDO SÓLIDA ---
 if not df_filtrado.empty:
     tab_lista.write("**Lista de Controle Rápido:**")
     st_df = df_filtrado[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
@@ -212,13 +207,17 @@ if not df_filtrado.empty:
     
     col_sel, col_btn_ed, col_btn_ex = tab_lista.columns([0.4, 0.3, 0.3])
     
-    with col_sel:
-        id_selecionado = st.selectbox("Selecione o ID de uma ação para alterar ou remover:", df_filtrado['id_acao'].tolist(), key="select_manutencao_tabela")
+    id_selecionado = col_sel.selectbox("Selecione o ID de uma ação para alterar ou remover:", df_filtrado['id_acao'].tolist(), key="select_manutencao_tabela")
     
-    with col_btn_ed:
-        if st.button("✏️ Editar ID Selecionado", use_container_width=True, key="btn_tabela_editar"):
-            st.session_state.edit_id = id_selecionado
-            st.rerun()
+    # CORREÇÃO DEFINITIVA: Botões chamados de forma plana eliminando blocos 'with' e riscos de recuo
+    if col_btn_ed.button("✏️ Editar ID Selecionado", use_container_width=True, key="btn_tabela_editar"):
+        st.session_state.edit_id = id_selecionado
+        st.rerun()
+        
+    if col_btn_ex.button("🗑️ Excluir ID Selecionado", use_container_width=True, key="btn_tabela_excluir"):
+        executar_db("DELETE FROM Acoes WHERE id_acao=?", (id_selecionado,), False)
+        st.cache_data.clear()
+        st.rerun()
             
-    with col_btn_ex:
-        # CORREÇÃO DEFINITIVA: Primeiro comando executável recuado perfeitamente dentro do bloco with
+    tab_lista.write("---")
+
