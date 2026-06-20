@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit st
 import sqlite3
 import pandas as pd
 import plotly.express as px
@@ -103,7 +103,8 @@ if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_exclu
 
 # --- TELA DE LOGIN ---
 if not st.session_state['logado']:
-    col_l1, col_l2, col_l3 = st.columns()
+    # CORREÇÃO CRUCIAL: Parâmetro numérico adicionado para estruturar o layout em 3 colunas
+    col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
         try:
             st.image("logo.png", use_container_width=True)
@@ -226,5 +227,4 @@ if not df.empty:
     filtro_quem = f1.multiselect("Filtrar por Responsável", options=list(df['quem'].unique()), default=[])
     filtro_status = f2.multiselect("Filtrar por Status", options=list(df['status'].unique()), default=[])
     
-    # CORREÇÃO DEFINITIVA EM LINHA ÚNICA: Remove os blocos aninhados 'if' eliminando erros de indentação para sempre
     df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)] if filtro_quem else df_filtrado
