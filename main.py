@@ -11,22 +11,19 @@ st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 # 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
-        # Caminho fixo imune a atualizações e resets do GitHub
         conn = sqlite3.connect("/tmp/banco_lavo_levo_estavel.db")
         conn.row_factory = sqlite3.Row  
         cursor = conn.cursor()
         
-        # Converte placeholders do MySQL (%s) para SQLite (?)
         sql_convertido = sql.replace("%s", "?")
-        
         cursor.execute(sql_convertido, params or ())
+        
         if retorno:
             resultado = [dict(row) for row in cursor.fetchall()]
             cursor.close()
             conn.close()
             return resultado
         else:
-            # Força a gravação física imediata dos dados de INSERT/UPDATE
             conn.commit()
             cursor.close()
             conn.close()
@@ -37,7 +34,6 @@ def executar_db(sql, params=None, retorno=True):
 
 # --- INICIALIZAÇÃO DA ESTRUTURA FIXA DO BANCO ---
 def inicializar_banco_local():
-    # Tabela de Credenciais
     executar_db("""
         CREATE TABLE IF NOT EXISTS Credenciais (
             id_credencial INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +43,6 @@ def inicializar_banco_local():
         )
     """, retorno=False)
     
-    # Tabela de Usuários/Responsáveis
     executar_db("""
         CREATE TABLE IF NOT EXISTS Usuarios (
             id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,7 +50,6 @@ def inicializar_banco_local():
         )
     """, retorno=False)
     
-    # Tabela de Ações (5W2H)
     executar_db("""
         CREATE TABLE IF NOT EXISTS Acoes (
             id_acao INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,14 +65,12 @@ def inicializar_banco_local():
         )
     """, retorno=False)
 
-    # Inserção de dados padrão se o banco local estiver vazio
     usuarios_existentes = executar_db("SELECT * FROM Usuarios")
     if not usuarios_existentes:
         executar_db("INSERT INTO Credenciais (usuario, senha, nivel) VALUES (?, ?, ?)", ("admin", "123", "Administrador"), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Equipe Lavo e Levo",), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Gerência",), retorno=False)
 
-# Inicializa o banco estável
 inicializar_banco_local()
 
 # 3. CONTROLE DE SESSÃO
@@ -90,10 +82,11 @@ if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_exclu
 if not st.session_state['logado']:
     st.markdown("<h2 style='text-align: center;'>🧺 Lavanderia Lavo e Levo</h2>", unsafe_allow_html=True)
     with st.form("login_form"):
-        u, s = st.text_input("Usuário (Padrão: admin)"), st.text_input("Senha (Padrão: 123)", type="password")
+        u, s = st.text_input("Usuário"), st.text_input("Senha", type="password")
         if st.form_submit_button("Entrar no Sistema"):
             res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
             if res and isinstance(res, list) and len(res) > 0:
+                # CORREÇÃO DEFINITIVA: Extrai o valor do nível acessando a primeira linha da lista
                 nivel_usuario = res[0].get('nivel', 'Comum')
                 st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                 st.rerun()
@@ -101,7 +94,7 @@ if not st.session_state['logado']:
                 st.error("Dados de acesso incorretos.")
     st.stop()
 
-# --- CARREGAR DADOS EM TEMPO REAL (Sem cache travando a tela) ---
+# --- CARREGAR DADOS ---
 def buscar_dados():
     return executar_db("SELECT A.*, U.nome as quem FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
 
@@ -118,13 +111,11 @@ st.markdown("""
     <hr style='border: 1px solid #3B82F6; margin-bottom: 30px;'>
 """, unsafe_allow_html=True)
 
-# --- CRIAÇÃO DAS ABAS ---
 tab_lista, tab_graficos = st.tabs(["📝 Lançamentos e Controle", "📊 Análise de Performance"])
 
 # ==============================================================================
-# 📝 CONTEÚDO DA ABA 1: LANÇAMENTOS E CONTROLE
+# 📝 ABA 1
 # ==============================================================================
-
 if tab_lista.button("➕ Nova Ação (Limpar)", use_container_width=True):
     st.session_state.edit_id = None
     st.rerun()
@@ -133,7 +124,6 @@ dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and isinstance(res_e, list) and len(res_e) > 0: 
-        # CORREÇÃO DA LEITURA DE EDIÇÃO: Extrai corretamente o dicionário da linha zero
         dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
@@ -196,7 +186,6 @@ if st.session_state.edit_id:
         st.session_state.edit_id = None
         st.rerun()
 
-# FILTROS DE LISTAGEM ISOLADOS
 tab_lista.subheader("📋 Ações e Prazos")
 df_filtrado = df.copy()
 
@@ -210,7 +199,6 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# EXIBIÇÃO EM LISTA CARD POR CARD
 if not df_filtrado.empty:
     for _, row in df_filtrado.iterrows():
         try:
@@ -224,3 +212,14 @@ if not df_filtrado.empty:
         cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
         
         card_container = tab_lista.container()
+        c1, c2, c3, c4 = card_container.columns([0.02, 0.78, 0.1, 0.1])
+        c1.markdown(f"<div style='background-color:{cor}; height:95px; width:8px; border-radius:5px'></div>", unsafe_allow_html=True)
+        
+        c2.write(f"**{row['descricao_acao']}** | {row['quem']} | **{dt_br}**")
+        if 'como' in row and row['como']:
+            c2.caption(f"🔧 **Como:** {row['como']}")
+        c2.caption(f"Status: {row['status']} | Prioridade: {row['prioridade']} | R$ {float(row['quanto_custa'] or 0):,.2f}")
+        
+        if row['observacoes']: 
+            c2.info(f"💬 {row['observacoes']}")
+        
