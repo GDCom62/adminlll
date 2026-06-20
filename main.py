@@ -96,11 +96,10 @@ def inicializar_banco_local():
 
 inicializar_banco_local()
 
-# 3. CONTROLE DE SESSÃO E MEMÓRIA VIVA (Garante atualização instantânea na tela)
+# 3. CONTROLE DE SESSÃO
 if 'logado' not in st.session_state: st.session_state['logado'] = False
 if 'edit_id' not in st.session_state: st.session_state.edit_id = None
 if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_excluir = None
-if 'dados_atualizados' not in st.session_state: st.session_state.dados_atualizados = True
 
 # --- TELA DE LOGIN ---
 if not st.session_state['logado']:
@@ -112,18 +111,19 @@ if not st.session_state['logado']:
             st.markdown("<h2 style='text-align: center;'>🧺 Lavanderia Lavo e Levo</h2>", unsafe_allow_html=True)
             st.caption("📷 *[Insira o arquivo logo.png no seu GitHub para exibir a imagem aqui]*")
         
-        with st.form("login_form"):
-            st.markdown("<h3 style='text-align: center; color: #1E3A8A;'>Acesso ao Sistema</h3>", unsafe_allow_html=True)
-            u = st.text_input("Usuário")
-            s = st.text_input("Senha", type="password")
-            if st.form_submit_button("Entrar no Sistema", use_container_width=True):
-                res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
-                if res and len(res) > 0:
-                    nivel_usuario = res[0]['nivel'] if 'nivel' in res[0] else 'Comum'
-                    st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
-                    st.rerun()
-                else:
-                    st.error("Dados de acesso incorretos.")
+        st.markdown("<h3 style='text-align: center; color: #1E3A8A;'>Acesso ao Sistema</h3>", unsafe_allow_html=True)
+        u = st.text_input("Usuário", key="login_u")
+        s = st.text_input("Senha", type="password", key="login_s")
+        
+        # Botão plano imune a erros de formulário do Python 3.14
+        if st.button("Entrar no Sistema", use_container_width=True, key="btn_login_acao"):
+            res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
+            if res and len(res) > 0:
+                nivel_usuario = res[0]['nivel'] if 'nivel' in res[0] else 'Comum'
+                st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
+                st.rerun()
+            else:
+                st.error("Dados de acesso incorretos.")
     st.stop()
 
 # --- CARREGAR DADOS ---
@@ -164,13 +164,14 @@ dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
 titulo_formulario = f"📝 Editando Ação #{st.session_state.edit_id}" if st.session_state.edit_id else "📝 Formulário 5W2H"
 form_expander = tab_lista.expander(titulo_formulario, expanded=(st.session_state.edit_id is not None))
 
-with form_expander.form("form_5w2h", clear_on_submit=True):
+# Container aberto (sem uso de st.form) para forçar o Python 3.14 a processar os cliques de salvar
+with form_expander:
     c1, c2 = st.columns(2)
     with c1:
-        what = st.text_input("What (O que?) *", value=dados_edit['descricao_acao'] if dados_edit else "")
-        why = st.text_area("Why (Por que?)", value=dados_edit['porque'] if dados_edit else "")
-        how = st.text_area("How (Como?)", value=dados_edit['como'] if dados_edit and 'como' in dados_edit else "")
-        prio = st.select_slider("Prioridade", options=["Baixa", "Média", "Alta"], value=dados_edit['prioridade'] if dados_edit else "Média")
+        what = st.text_input("What (O que?) *", value=dados_edit['descricao_acao'] if dados_edit else "", key="inp_what")
+        why = st.text_area("Why (Por que?)", value=dados_edit['porque'] if dados_edit else "", key="inp_why")
+        how = st.text_area("How (Como?)", value=dados_edit['como'] if dados_edit and 'como' in dados_edit else "", key="inp_how")
+        prio = st.select_slider("Prioridade", options=["Baixa", "Média", "Alta"], value=dados_edit['prioridade'] if dados_edit else "Média", key="inp_prio")
     with c2:
         nome_padrao = "Selecione"
         if dados_edit:
@@ -181,7 +182,7 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
         lista_usuarios = list(dict_u.keys())
         index_u = lista_usuarios.index(nome_padrao) if nome_padrao in lista_usuarios else 0
         
-        who = st.selectbox("Who (Quem?)", lista_usuarios, index=index_u)
+        who = st.selectbox("Who (Quem?)", lista_usuarios, index=index_u, key="inp_who")
         
         prazo_inicial = date.today()
         if dados_edit and dados_edit['prazo']:
@@ -190,17 +191,17 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
             except:
                 prazo_inicial = date.today()
                 
-        when = st.date_input("When (Prazo)", prazo_inicial, format="DD/MM/YYYY")
-        cost = st.number_input("How Much (Custo R$)", value=float(dados_edit['quanto_custa'] or 0) if dados_edit else 0.0)
+        when = st.date_input("When (Prazo)", prazo_inicial, format="DD/MM/YYYY", key="inp_when")
+        cost = st.number_input("How Much (Custo R$)", value=float(dados_edit['quanto_custa'] or 0) if dados_edit else 0.0, key="inp_cost")
         
         status_opcoes = ["Em análise", "Em andamento", "Concluído"]
         status_index = status_opcoes.index(dados_edit['status']) if dados_edit and dados_edit['status'] in status_opcoes else 0
-        status = st.selectbox("Status", status_opcoes, index=status_index)
+        status = st.selectbox("Status", status_opcoes, index=status_index, key="inp_status")
         
-        obs = st.text_input("Observações", value=dados_edit['observacoes'] if dados_edit else "")
+        obs = st.text_input("Observações", value=dados_edit['observacoes'] if dados_edit else "", key="inp_obs")
 
     texto_botao_salvar = "💾 Gravar Alterações" if st.session_state.edit_id else "💾 Salvar Plano de Ação"
-    if st.form_submit_button(texto_botao_salvar, use_container_width=True):
+    if st.button(texto_botao_salvar, use_container_width=True, key="btn_salvar_definitivo"):
         if not what.strip():
             st.error("O campo 'What (O que?)' é obrigatório.")
         else:
@@ -211,7 +212,6 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
             else:
                 sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
                 executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
-            st.session_state.dados_atualizados = True
             st.rerun()
 
 if st.session_state.edit_id: 
