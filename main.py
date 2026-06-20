@@ -8,7 +8,7 @@ import io
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 
-# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
+# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE (CORRIGIDA)
 def executar_db(sql, params=None, retorno=True):
     try:
         # Caminho fixo na pasta protegida do servidor, imune a atualizações do GitHub
@@ -25,7 +25,9 @@ def executar_db(sql, params=None, retorno=True):
             conn.close()
             return resultado
         else:
+            # CORREÇÃO CRUCIAL: Commit precisa rodar ANTES de fechar a conexão
             conn.commit()
+            cursor.close()
             conn.close()
             return True
     except Exception as e:
@@ -208,7 +210,7 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# EXIBIÇÃO EM LISTA CARD POR CARD COM OS BOTÕES ATIVOS
+# EXIBIÇÃO EM LISTA CARD POR CARD
 if not df_filtrado.empty:
     for _, row in df_filtrado.iterrows():
         try:
@@ -222,6 +224,4 @@ if not df_filtrado.empty:
         cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
         
         card_container = tab_lista.container()
-        
-        # Criação das colunas do cartão: c3 abriga o botão Editar e c4 abriga o botão Excluir
         c1, c2, c3, c4 = card_container.columns([0.02, 0.78, 0.1, 0.1])
