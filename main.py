@@ -89,8 +89,9 @@ if not st.session_state['logado']:
         u, s = st.text_input("Usuário (Padrão: admin)"), st.text_input("Senha (Padrão: 123)", type="password")
         if st.form_submit_button("Entrar no Sistema"):
             res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
-            if res:
-                nivel_usuario = res.get('nivel', 'Comum')
+            if res and isinstance(res, list) and len(res) > 0:
+                # CORREÇÃO CRUCIAL: Acessa o primeiro dicionário da lista retornada
+                nivel_usuario = res[0].get('nivel', 'Comum')
                 st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                 st.rerun()
             else:
@@ -204,7 +205,7 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# EXIBIÇÃO EM LISTA CARD POR CARD (Layout Original Totalmente Corrigido)
+# EXIBIÇÃO EM LISTA CARD POR CARD
 if not df_filtrado.empty:
     for _, row in df_filtrado.iterrows():
         try:
@@ -224,5 +225,3 @@ if not df_filtrado.empty:
         c2.write(f"**{row['descricao_acao']}** | {row['quem']} | **{dt_br}**")
         if 'como' in row and row['como']:
             c2.caption(f"🔧 **Como:** {row['como']}")
-        c2.caption(f"Status: {row['status']} | Prioridade: {row['prioridade']} | R$ {float(row['quanto_custa'] or 0):,.2f}")
-        
