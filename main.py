@@ -182,6 +182,7 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
             else:
                 sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
                 executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
+            st.cache_data.clear()
             st.rerun()
 
 if st.session_state.edit_id: 
@@ -203,7 +204,7 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# --- LISTA DE CONTROLE RÁPIDO ---
+# --- LISTA DE CONTROLE RÁPIDO CORRIGIDA SEM ABAS OU TABULAÇÕES OCULTAS ---
 if not df_filtrado.empty:
     tab_lista.write("**Lista de Controle Rápido:**")
     st_df = df_filtrado[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
@@ -213,10 +214,11 @@ if not df_filtrado.empty:
     
     with col_sel:
         id_selecionado = st.selectbox("Selecione o ID de uma ação para alterar ou remover:", df_filtrado['id_acao'].tolist(), key="select_manutencao_tabela")
+    
     with col_btn_ed:
         if st.button("✏️ Editar ID Selecionado", use_container_width=True, key="btn_tabela_editar"):
             st.session_state.edit_id = id_selecionado
             st.rerun()
+            
     with col_btn_ex:
-        # CORREÇÃO DEFINITIVA: Resposta do 'if' movida para a linha de baixo com 4 espaços obrigatórios de recuo
-        if st.button("🗑️ Excluir ID Selecionado", use_container_width=True, key="btn_tabela_excluir"):
+        # ALINHAMENTO CORRETO: Resposta do if colocada na linha inferior com recuo perfeito por espaços puros
