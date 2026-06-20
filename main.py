@@ -68,7 +68,7 @@ def inicializar_banco_local():
     """, retorno=False)
 
     # Inserção de dados padrão de teste se o banco estiver vazio
-    usuarios_existentes = executar_db("SELECT * FROM Usuarios")
+    usuarios_existentes = executing_db = executar_db("SELECT * FROM Usuarios")
     if not usuarios_existentes:
         executar_db("INSERT INTO Credenciais (usuario, senha, nivel) VALUES (?, ?, ?)", ("admin", "123", "Administrador"), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Equipe Lavo e Levo",), retorno=False)
@@ -90,7 +90,6 @@ if not st.session_state['logado']:
         if st.form_submit_button("Entrar no Sistema"):
             res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
             if res and isinstance(res, list) and len(res) > 0:
-                # CORREÇÃO CRUCIAL: Acessa o primeiro dicionário da lista retornada
                 nivel_usuario = res[0].get('nivel', 'Comum')
                 st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                 st.rerun()
@@ -133,17 +132,20 @@ dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and isinstance(res_e, list) and len(res_e) > 0: 
+        # CORREÇÃO CRUCIAL: Captura a primeira linha de forma direta e segura
         dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
 dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
 
-form_expander = tab_lista.expander("📝 Formulário 5W2H", expanded=(st.session_state.edit_id is not None))
+# Define o título do expander informando se é novo cadastro ou edição
+titulo_formulario = f"📝 Editando Ação #{st.session_state.edit_id}" if st.session_state.edit_id else "📝 Formulário 5W2H"
+form_expander = tab_lista.expander(titulo_formulario, expanded=(st.session_state.edit_id is not None))
 
 with form_expander.form("form_5w2h", clear_on_submit=True):
     c1, c2 = st.columns(2)
     with c1:
-        what = st.text_input("What (O que?)", value=dados_edit['descricao_acao'] if dados_edit else "")
+        what = st.text_input("What (O que?) *", value=dados_edit['descricao_acao'] if dados_edit else "")
         why = st.text_area("Why (Por que?)", value=dados_edit['porque'] if dados_edit else "")
         how = st.text_area("How (Como?)", value=dados_edit['como'] if dados_edit and 'como' in dados_edit else "")
         prio = st.select_slider("Prioridade", options=["Baixa", "Média", "Alta"], value=dados_edit['prioridade'] if dados_edit else "Média")
@@ -175,19 +177,23 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
         
         obs = st.text_input("Observações", value=dados_edit['observacoes'] if dados_edit else "")
 
-    if st.form_submit_button("💾 Salvar Plano de Ação"):
-        if st.session_state.edit_id:
-            sql = "UPDATE Acoes SET descricao_acao=?, porque=?, como=?, id_responsavel=?, prazo=?, quanto_custa=?, status=?, prioridade=?, observacoes=? WHERE id_acao=?"
-            executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs, st.session_state.edit_id), False)
-            st.session_state.edit_id = None
+    texto_botao_salvar = "💾 Gravar Alterações" if st.session_state.edit_id else "💾 Salvar Plano de Ação"
+    if st.form_submit_button(texto_botao_salvar, use_container_width=True):
+        if not what.strip():
+            st.error("O campo 'What (O que?)' é obrigatório.")
         else:
-            sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
-            executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
-        st.cache_data.clear()
-        st.rerun()
+            if st.session_state.edit_id:
+                sql = "UPDATE Acoes SET descricao_acao=?, porque=?, como=?, id_responsavel=?, prazo=?, quanto_custa=?, status=?, prioridade=?, observacoes=? WHERE id_acao=?"
+                executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs, st.session_state.edit_id), False)
+                st.session_state.edit_id = None
+            else:
+                sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
+                executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
+            st.cache_data.clear()
+            st.rerun()
 
 if st.session_state.edit_id: 
-    if form_expander.button("❌ Cancelar Edição"):
+    if form_expander.button("❌ Cancelar Modo Edição", use_container_width=True):
         st.session_state.edit_id = None
         st.rerun()
 
@@ -219,9 +225,3 @@ if not df_filtrado.empty:
         cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
         
         card_container = tab_lista.container()
-        c1, c2, c3, c4 = card_container.columns([0.02, 0.78, 0.1, 0.1])
-        c1.markdown(f"<div style='background-color:{cor}; height:95px; width:8px; border-radius:5px'></div>", unsafe_allow_html=True)
-        
-        c2.write(f"**{row['descricao_acao']}** | {row['quem']} | **{dt_br}**")
-        if 'como' in row and row['como']:
-            c2.caption(f"🔧 **Como:** {row['como']}")
