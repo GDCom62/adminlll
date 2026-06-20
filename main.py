@@ -116,7 +116,6 @@ if not st.session_state['logado']:
             if st.form_submit_button("Entrar no Sistema", use_container_width=True):
                 res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
                 if res and len(res) > 0:
-                    # CORREÇÃO DEFINITIVA DO LOGIN NO SQLITE
                     nivel_usuario = res[0]['nivel'] if 'nivel' in res[0] else 'Comum'
                     st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                     st.rerun()
@@ -154,7 +153,6 @@ dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and len(res_e) > 0: 
-        # CORREÇÃO DEFINITIVA DA LEITURA DE EDIÇÃO NO SQLITE
         dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
@@ -231,5 +229,7 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# --- LISTA DE CONTROLE RÁPIDO ---
-if not df_filtrado.empty:
+# --- LISTA DE CONTROLE RÁPIDO E CARDS VISUAIS BLINDADOS ---
+if df_filtrado.empty:
+    tab_lista.info("Nenhuma ação cadastrada ou correspondente aos filtros.")
+else:
