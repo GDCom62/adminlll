@@ -65,14 +65,12 @@ def inicializar_banco_local():
         )
     """, retorno=False)
 
-    # Inserção de dados padrão se o banco local estiver vazio
     usuarios_existentes = executar_db("SELECT * FROM Usuarios")
     if not usuarios_existentes:
         executar_db("INSERT INTO Credenciais (usuario, senha, nivel) VALUES (?, ?, ?)", ("admin", "123", "Administrador"), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Equipe Lavo e Levo",), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Gerência",), retorno=False)
 
-    # GARANTIA: Verifica se o responsável 'Administrativo' já existe, senão adiciona ele
     check_adm = executar_db("SELECT * FROM Usuarios WHERE nome = ?", ("Administrativo",))
     if not check_adm:
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Administrativo",), retorno=False)
@@ -205,7 +203,7 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# --- LISTA DE CONTROLE E EXCLUSÃO DEFINITIVA ---
+# --- LISTA DE CONTROLE E EXCLUSÃO (CORRIGIDA LINHA POR LINHA) ---
 if not df_filtrado.empty:
     tab_lista.write("**Lista de Controle Rápido:**")
     st_df = df_filtrado[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
@@ -220,3 +218,5 @@ if not df_filtrado.empty:
             st.session_state.edit_id = id_selecionado
             st.rerun()
     with col_btn_ex:
+        # CORREÇÃO: Alinhamento seguro com 4 espaços internos do bloco with
+        if st.button("🗑️ Excluir ID Selecionado", use_container_width=True, key="btn_tabela_excluir"):
