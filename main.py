@@ -117,7 +117,8 @@ if not st.session_state['logado']:
             s = st.text_input("Senha", type="password")
             if st.form_submit_button("Entrar no Sistema", use_container_width=True):
                 res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
-                if res and isinstance(res, list) and len(res) > 0:
+                if res and len(res) > 0:
+                    # CORREÇÃO CRUCIAL DO LOGIN: Lê o dicionário de dentro da lista retornada pelo banco
                     nivel_usuario = res[0].get('nivel', 'Comum')
                     st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                     st.rerun()
@@ -154,7 +155,8 @@ if tab_lista.button("➕ Nova Ação (Limpar)", use_container_width=True):
 dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
-    if res_e and isinstance(res_e, list) and len(res_e) > 0: 
+    if res_e and len(res_e) > 0: 
+        # CORREÇÃO CRUCIAL DA EDIÇÃO: Extrai o dicionário da linha zero da lista do banco
         dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
@@ -226,6 +228,3 @@ if not df.empty:
     filtro_quem = f1.multiselect("Filtrar por Responsável", options=list(df['quem'].unique()), default=[])
     filtro_status = f2.multiselect("Filtrar por Status", options=list(df['status'].unique()), default=[])
     
-    df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)] if filtro_quem else df_filtrado
-    df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)] if filtro_status else df_filtrado
-
