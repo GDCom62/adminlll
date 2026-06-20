@@ -8,14 +8,15 @@ import io
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 
-# 2. FUNÇÃO DE CONEXÃO LOCAL COM SQLITE
+# 2. FUNÇÃO DE CONEXÃO FIXA E PERSISTENTE COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
-        conn = sqlite3.connect("banco_lavo_levo.db")
-        conn.row_factory = sqlite3.Row  # Faz retornar como se fosse o DictCursor do pymysql
+        # Usar o caminho /tmp/ garante que o arquivo não seja resetado quando o código mudar no GitHub
+        conn = sqlite3.connect("/tmp/banco_lavo_levo_estavel.db")
+        conn.row_factory = sqlite3.Row  
         cursor = conn.cursor()
         
-        # Converte a sintaxe de placeholders do MySQL (%s) para SQLite (?)
+        # Converte placeholders do MySQL (%s) para SQLite (?)
         sql_convertido = sql.replace("%s", "?")
         
         cursor.execute(sql_convertido, params or ())
@@ -31,7 +32,7 @@ def executar_db(sql, params=None, retorno=True):
         st.error(f"Erro no banco: {e}")
         return None
 
-# --- INICIALIZAÇÃO DA ESTRUTURA LOCAL DO BANCO ---
+# --- INICIALIZAÇÃO DA ESTRUTURA FIXA DO BANCO ---
 def inicializar_banco_local():
     # Tabela de Credenciais
     executar_db("""
@@ -67,14 +68,14 @@ def inicializar_banco_local():
         )
     """, retorno=False)
 
-    # Inserção de dados padrão de teste se o banco estiver vazio
-    usuarios_existentes = executing_db = executar_db("SELECT * FROM Usuarios")
+    # Inserção de dados padrão de segurança
+    usuarios_existentes = executar_db("SELECT * FROM Usuarios")
     if not usuarios_existentes:
         executar_db("INSERT INTO Credenciais (usuario, senha, nivel) VALUES (?, ?, ?)", ("admin", "123", "Administrador"), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Equipe Lavo e Levo",), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Gerência",), retorno=False)
 
-# Roda a inicialização automática do banco SQLite local
+# Inicializa o banco na pasta persistente
 inicializar_banco_local()
 
 # 3. CONTROLE DE SESSÃO
@@ -122,23 +123,20 @@ tab_lista, tab_graficos = st.tabs(["📝 Lançamentos e Controle", "📊 Anális
 # 📝 CONTEÚDO DA ABA 1: LANÇAMENTOS E CONTROLE
 # ==============================================================================
 
-# BOTÃO DE ATALHO PARA CRIAR NOVO ITEM
 if tab_lista.button("➕ Nova Ação (Limpar)", use_container_width=True):
     st.session_state.edit_id = None
     st.rerun()
 
-# FORMULÁRIO (CADASTRO / EDIÇÃO)
 dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and isinstance(res_e, list) and len(res_e) > 0: 
-        # CORREÇÃO CRUCIAL: Captura a primeira linha de forma direta e segura
+        # CORREÇÃO CRUCIAL DA EDIÇÃO: Lê a linha zero da lista corretamente
         dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
 dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
 
-# Define o título do expander informando se é novo cadastro ou edição
 titulo_formulario = f"📝 Editando Ação #{st.session_state.edit_id}" if st.session_state.edit_id else "📝 Formulário 5W2H"
 form_expander = tab_lista.expander(titulo_formulario, expanded=(st.session_state.edit_id is not None))
 
@@ -225,3 +223,4 @@ if not df_filtrado.empty:
         cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
         
         card_container = tab_lista.container()
+        c1, c2, c3, c4 = card_container.columns([0.02, 0.78, 0.1, 0.1])
