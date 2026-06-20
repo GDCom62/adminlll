@@ -31,7 +31,7 @@ def executar_db(sql, params=None, retorno=True):
         st.error(f"Erro no banco: {e}")
         return None
 
-# --- INICIALIZAÇÃO DA ESTRUTURA LOCAL DO BANCO (Caso não exista) ---
+# --- INICIALIZAÇÃO DA ESTRUTURA LOCAL DO BANCO ---
 def inicializar_banco_local():
     # Tabela de Credenciais
     executar_db("""
@@ -90,7 +90,7 @@ if not st.session_state['logado']:
         if st.form_submit_button("Entrar no Sistema"):
             res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
             if res:
-                nivel_usuario = res[0].get('nivel', 'Comum')
+                nivel_usuario = res.get('nivel', 'Comum')
                 st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                 st.rerun()
             else:
@@ -204,7 +204,7 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# EXIBIÇÃO EM LISTA CARD POR CARD (Layout Original Restaurado)
+# EXIBIÇÃO EM LISTA CARD POR CARD (Layout Original Totalmente Corrigido)
 if not df_filtrado.empty:
     for _, row in df_filtrado.iterrows():
         try:
@@ -225,4 +225,4 @@ if not df_filtrado.empty:
         if 'como' in row and row['como']:
             c2.caption(f"🔧 **Como:** {row['como']}")
         c2.caption(f"Status: {row['status']} | Prioridade: {row['prioridade']} | R$ {float(row['quanto_custa'] or 0):,.2f}")
-        if row['observacoes']: 
+        
