@@ -58,7 +58,7 @@ if not st.session_state['logado']:
             res = executar_db("SELECT * FROM Credenciais WHERE usuario=%s AND senha=%s", (u, s))
             if res:
                 if isinstance(res, list) and len(res) > 0:
-                    nivel_usuario = res[0].get('nivel', 'Comum')
+                    nivel_usuario = res.get('nivel', 'Comum')
                 else:
                     nivel_usuario = 'Comum'
                 st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
@@ -100,7 +100,7 @@ with tab_lista:
     if st.session_state.edit_id:
         res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=%s", (st.session_state.edit_id,))
         if res_e and isinstance(res_e, list) and len(res_e) > 0: 
-            dados_edit = res_e[0]
+            dados_edit = res_e
 
     with st.expander("📝 Formulário 5W2H", expanded=(st.session_state.edit_id is not None)):
         res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
@@ -204,6 +204,5 @@ with tab_lista:
     else:
         st.info("Nenhuma ação cadastrada ou correspondente aos filtros.")
 
-# --- ABA DE GRÁFICOS COMPLETAMENTE CORRIGIDA ---
+# --- ABA DE GRÁFICOS (REESTRUTURADA SEM ANINHAMENTO CONDICIONAL) ---
 with tab_graficos:
-    if df.empty:
