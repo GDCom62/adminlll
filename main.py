@@ -11,12 +11,10 @@ st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 # 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
-        # Caminho fixo imune a atualizações e resets do GitHub
         conn = sqlite3.connect("/tmp/banco_lavo_levo_estavel.db")
         conn.row_factory = sqlite3.Row  
         cursor = conn.cursor()
         
-        # Converte placeholders do MySQL (%s) para SQLite (?)
         sql_convertido = sql.replace("%s", "?")
         cursor.execute(sql_convertido, params or ())
         
@@ -26,7 +24,6 @@ def executar_db(sql, params=None, retorno=True):
             conn.close()
             return resultado
         else:
-            # Força a gravação física imediata dos dados de INSERT/UPDATE
             conn.commit()
             cursor.close()
             conn.close()
@@ -68,11 +65,17 @@ def inicializar_banco_local():
         )
     """, retorno=False)
 
+    # Inserção de dados padrão se o banco local estiver vazio
     usuarios_existentes = executar_db("SELECT * FROM Usuarios")
     if not usuarios_existentes:
         executar_db("INSERT INTO Credenciais (usuario, senha, nivel) VALUES (?, ?, ?)", ("admin", "123", "Administrador"), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Equipe Lavo e Levo",), retorno=False)
         executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Gerência",), retorno=False)
+
+    # GARANTIA: Verifica se o responsável 'Administrativo' já existe, senão adiciona ele
+    check_adm = executar_db("SELECT * FROM Usuarios WHERE nome = ?", ("Administrativo",))
+    if not check_adm:
+        executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Administrativo",), retorno=False)
 
 inicializar_banco_local()
 
@@ -179,8 +182,7 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
                 executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs, st.session_state.edit_id), False)
                 st.session_state.edit_id = None
             else:
-                sql = "INSERT INTO Acoes (descricao_acao, because, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
-                sql = sql.replace("because", "porque")
+                sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
                 executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
             st.rerun()
 
@@ -203,15 +205,12 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
-# --- TABELA INTERATIVA DE BACKUP DE EDICAO/EXCLUSAO ---
+# --- LISTA DE CONTROLE E EXCLUSÃO DEFINITIVA ---
 if not df_filtrado.empty:
     tab_lista.write("**Lista de Controle Rápido:**")
-    # Mostra os dados em uma tabela interativa para garantir visibilidade 100%
     st_df = df_filtrado[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
     tab_lista.dataframe(st_df, use_container_width=True, hide_index=True)
     
-    # Painel de controle dedicado com botões fixos acoplados à tabela
-    st.write("**Painel de Ações de Registro:**")
     col_sel, col_btn_ed, col_btn_ex = tab_lista.columns([0.4, 0.3, 0.3])
     
     with col_sel:
@@ -219,3 +218,5 @@ if not df_filtrado.empty:
     with col_btn_ed:
         if st.button("✏️ Editar ID Selecionado", use_container_width=True, key="btn_tabela_editar"):
             st.session_state.edit_id = id_selecionado
+            st.rerun()
+    with col_btn_ex:
