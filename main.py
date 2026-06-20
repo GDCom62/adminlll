@@ -11,10 +11,12 @@ st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 # 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
+        # Caminho fixo imune a atualizações e resets do GitHub
         conn = sqlite3.connect("/tmp/banco_lavo_levo_estavel.db")
         conn.row_factory = sqlite3.Row  
         cursor = conn.cursor()
         
+        # Converte placeholders do MySQL (%s) para SQLite (?)
         sql_convertido = sql.replace("%s", "?")
         cursor.execute(sql_convertido, params or ())
         
@@ -24,6 +26,7 @@ def executar_db(sql, params=None, retorno=True):
             conn.close()
             return resultado
         else:
+            # Força a gravação física imediata dos dados de INSERT/UPDATE
             conn.commit()
             cursor.close()
             conn.close()
@@ -86,7 +89,6 @@ if not st.session_state['logado']:
         if st.form_submit_button("Entrar no Sistema"):
             res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
             if res and isinstance(res, list) and len(res) > 0:
-                # CORREÇÃO DEFINITIVA: Extrai o valor do nível acessando a primeira linha da lista
                 nivel_usuario = res[0].get('nivel', 'Comum')
                 st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                 st.rerun()
@@ -114,7 +116,7 @@ st.markdown("""
 tab_lista, tab_graficos = st.tabs(["📝 Lançamentos e Controle", "📊 Análise de Performance"])
 
 # ==============================================================================
-# 📝 ABA 1
+# 📝 CONTEÚDO DA ABA 1: LANÇAMENTOS E CONTROLE
 # ==============================================================================
 if tab_lista.button("➕ Nova Ação (Limpar)", use_container_width=True):
     st.session_state.edit_id = None
@@ -177,7 +179,8 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
                 executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs, st.session_state.edit_id), False)
                 st.session_state.edit_id = None
             else:
-                sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
+                sql = "INSERT INTO Acoes (descricao_acao, because, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
+                sql = sql.replace("because", "porque")
                 executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
             st.rerun()
 
@@ -186,6 +189,7 @@ if st.session_state.edit_id:
         st.session_state.edit_id = None
         st.rerun()
 
+# FILTROS DE LISTAGEM ISOLADOS
 tab_lista.subheader("📋 Ações e Prazos")
 df_filtrado = df.copy()
 
@@ -199,27 +203,19 @@ if not df.empty:
     if filtro_status:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
+# --- TABELA INTERATIVA DE BACKUP DE EDICAO/EXCLUSAO ---
 if not df_filtrado.empty:
-    for _, row in df_filtrado.iterrows():
-        try:
-            dt_br = datetime.strptime(row['prazo'], '%Y-%m-%d').strftime('%d/%m/%Y')
-            data_prazo = datetime.strptime(row['prazo'], '%Y-%m-%d').date()
-        except:
-            dt_br = str(row['prazo'])
-            data_prazo = hoje
-            
-        atraso = data_prazo < hoje and row['status'] != 'Concluído'
-        cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
-        
-        card_container = tab_lista.container()
-        c1, c2, c3, c4 = card_container.columns([0.02, 0.78, 0.1, 0.1])
-        c1.markdown(f"<div style='background-color:{cor}; height:95px; width:8px; border-radius:5px'></div>", unsafe_allow_html=True)
-        
-        c2.write(f"**{row['descricao_acao']}** | {row['quem']} | **{dt_br}**")
-        if 'como' in row and row['como']:
-            c2.caption(f"🔧 **Como:** {row['como']}")
-        c2.caption(f"Status: {row['status']} | Prioridade: {row['prioridade']} | R$ {float(row['quanto_custa'] or 0):,.2f}")
-        
-        if row['observacoes']: 
-            c2.info(f"💬 {row['observacoes']}")
-        
+    tab_lista.write("**Lista de Controle Rápido:**")
+    # Mostra os dados em uma tabela interativa para garantir visibilidade 100%
+    st_df = df_filtrado[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
+    tab_lista.dataframe(st_df, use_container_width=True, hide_index=True)
+    
+    # Painel de controle dedicado com botões fixos acoplados à tabela
+    st.write("**Painel de Ações de Registro:**")
+    col_sel, col_btn_ed, col_btn_ex = tab_lista.columns([0.4, 0.3, 0.3])
+    
+    with col_sel:
+        id_selecionado = st.selectbox("Selecione o ID de uma ação para alterar ou remover:", df_filtrado['id_acao'].tolist(), key="select_manutencao_tabela")
+    with col_btn_ed:
+        if st.button("✏️ Editar ID Selecionado", use_container_width=True, key="btn_tabela_editar"):
+            st.session_state.edit_id = id_selecionado
