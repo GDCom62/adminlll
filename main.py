@@ -85,124 +85,137 @@ st.markdown("""
     <hr style='border: 1px solid #3B82F6; margin-bottom: 30px;'>
 """, unsafe_allow_html=True)
 
-# --- ABAS ---
+# --- CRIAÇÃO DAS ABAS ---
 tab_lista, tab_graficos = st.tabs(["📝 Lançamentos e Controle", "📊 Análise de Performance"])
 
-with tab_lista:
-    # BOTÃO DE ATALHO PARA CRIAR NOVO ITEM
-    c_btn, _ = st.columns([0.2, 0.8])
-    if c_btn.button("➕ Nova Ação (Limpar)", use_container_width=True):
+# ==============================================================================
+# 📝 CONTEÚDO DA ABA 1: LANÇAMENTOS E CONTROLE (SEM USO DE 'WITH')
+# ==============================================================================
+
+# BOTÃO DE ATALHO PARA CRIAR NOVO ITEM
+if tab_lista.button("➕ Nova Ação (Limpar)", use_container_width=True):
+    st.session_state.edit_id = None
+    st.rerun()
+
+# FORMULÁRIO (CADASTRO / EDIÇÃO)
+dados_edit = None
+if st.session_state.edit_id:
+    res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=%s", (st.session_state.edit_id,))
+    if res_e and isinstance(res_e, list) and len(res_e) > 0: 
+        dados_edit = res_e[0]
+
+res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
+dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
+
+# Criamos o expander diretamente associado à tab_lista
+form_expander = tab_lista.expander("📝 Formulário 5W2H", expanded=(st.session_state.edit_id is not None))
+
+with form_expander.form("form_5w2h", clear_on_submit=True):
+    c1, c2 = st.columns(2)
+    with c1:
+        what = st.text_input("What (O que?)", value=dados_edit['descricao_acao'] if dados_edit else "")
+        why = st.text_area("Why (Por que?)", value=dados_edit['porque'] if dados_edit else "")
+        how = st.text_area("How (Como?)", value=dados_edit['como'] if dados_edit and 'como' in dados_edit else "")
+        prio = st.select_slider("Prioridade", options=["Baixa", "Média", "Alta"], value=dados_edit['prioridade'] if dados_edit else "Média")
+    with c2:
+        nome_padrao = "Selecione"
+        if dados_edit:
+            for nome_u, id_u in dict_u.items():
+                if id_u == dados_edit['id_responsavel']:
+                    nome_padrao = nome_u
+        
+        lista_usuarios = list(dict_u.keys())
+        index_u = lista_usuarios.index(nome_padrao) if nome_padrao in lista_usuarios else 0
+        
+        who = st.selectbox("Who (Quem?)", lista_usuarios, index=index_u)
+        when = st.date_input("When (Prazo)", dados_edit['prazo'] if dados_edit else date.today(), format="DD/MM/YYYY")
+        cost = st.number_input("How Much (Custo R$)", value=float(dados_edit['quanto_custa'] or 0) if dados_edit else 0.0)
+        
+        status_opcoes = ["Em análise", "Em andamento", "Concluído"]
+        status_index = status_opcoes.index(dados_edit['status']) if dados_edit and dados_edit['status'] in status_opcoes else 0
+        status = st.selectbox("Status", status_opcoes, index=status_index)
+        
+        obs = st.text_input("Observações", value=dados_edit['observacoes'] if dados_edit else "")
+
+    if st.form_submit_button("💾 Salvar Plano de Ação"):
+        if st.session_state.edit_id:
+            sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, como=%s, id_responsavel=%s, prazo=%s, quanto_custa=%s, status=%s, prioridade=%s, observacoes=%s WHERE id_acao=%s"
+            executar_db(sql, (what, why, how, dict_u[who], when, cost, status, prio, obs, st.session_state.edit_id), False)
+            st.session_state.edit_id = None
+        else:
+            sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            executar_db(sql, (what, why, how, dict_u[who], when, cost, status, prio, obs), False)
+        st.cache_data.clear()
+        st.rerun()
+
+if st.session_state.edit_id: 
+    if form_expander.button("❌ Cancelar Edição"):
         st.session_state.edit_id = None
         st.rerun()
 
-    # FORMULÁRIO (CADASTRO / EDIÇÃO)
-    dados_edit = None
-    if st.session_state.edit_id:
-        res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=%s", (st.session_state.edit_id,))
-        if res_e and isinstance(res_e, list) and len(res_e) > 0: 
-            dados_edit = res_e[0]
+# FILTROS DE LISTAGEM ISOLADOS
+tab_lista.subheader("📋 Ações e Prazos")
+df_filtrado = df.copy()
 
-    with st.expander("📝 Formulário 5W2H", expanded=(st.session_state.edit_id is not None)):
-        res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
-        dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
+if not df.empty:
+    f1, f2 = tab_lista.columns(2)
+    filtro_quem = f1.multiselect("Filtrar por Responsável", options=list(df['quem'].unique()), default=[])
+    filtro_status = f2.multiselect("Filtrar por Status", options=list(df['status'].unique()), default=[])
+    
+    if filtro_quem:
+        df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)]
+    if filtro_status:
+        df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
+
+# EXIBIÇÃO EM LISTA CARD POR CARD
+if not df_filtrado.empty:
+    for _, row in df_filtrado.iterrows():
+        dt_br = pd.to_datetime(row['prazo']).strftime('%d/%m/%Y')
+        atraso = pd.to_datetime(row['prazo']).date() < hoje and row['status'] != 'Concluído'
+        cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
         
-        with st.form("form_5w2h", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                what = st.text_input("What (O que?)", value=dados_edit['descricao_acao'] if dados_edit else "")
-                why = st.text_area("Why (Por que?)", value=dados_edit['porque'] if dados_edit else "")
-                how = st.text_area("How (Como?)", value=dados_edit['como'] if dados_edit and 'como' in dados_edit else "")
-                prio = st.select_slider("Prioridade", options=["Baixa", "Média", "Alta"], value=dados_edit['prioridade'] if dados_edit else "Média")
-            with c2:
-                nome_padrao = "Selecione"
-                if dados_edit:
-                    for nome_u, id_u in dict_u.items():
-                        if id_u == dados_edit['id_responsavel']:
-                            nome_padrao = nome_u
-                
-                lista_usuarios = list(dict_u.keys())
-                index_u = lista_usuarios.index(nome_padrao) if nome_padrao in lista_usuarios else 0
-                
-                who = st.selectbox("Who (Quem?)", lista_usuarios, index=index_u)
-                when = st.date_input("When (Prazo)", dados_edit['prazo'] if dados_edit else date.today(), format="DD/MM/YYYY")
-                cost = st.number_input("How Much (Custo R$)", value=float(dados_edit['quanto_custa'] or 0) if dados_edit else 0.0)
-                
-                status_opcoes = ["Em análise", "Em andamento", "Concluído"]
-                status_index = status_opcoes.index(dados_edit['status']) if dados_edit and dados_edit['status'] in status_opcoes else 0
-                status = st.selectbox("Status", status_opcoes, index=status_index)
-                
-                obs = st.text_input("Observações", value=dados_edit['observacoes'] if dados_edit else "")
-
-            if st.form_submit_button("💾 Salvar Plano de Ação"):
-                if st.session_state.edit_id:
-                    sql = "UPDATE Acoes SET descricao_acao=%s, porque=%s, como=%s, id_responsavel=%s, prazo=%s, quanto_custa=%s, status=%s, prioridade=%s, observacoes=%s WHERE id_acao=%s"
-                    executar_db(sql, (what, why, how, dict_u[who], when, cost, status, prio, obs, st.session_state.edit_id), False)
-                    st.session_state.edit_id = None
-                else:
-                    sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-                    executar_db(sql, (what, why, how, dict_u[who], when, cost, status, prio, obs), False)
+        card_container = tab_lista.container()
+        c1, c2, c3, c4 = card_container.columns([0.02, 0.78, 0.1, 0.1])
+        c1.markdown(f"<div style='background-color:{cor}; height:95px; width:8px; border-radius:5px'></div>", unsafe_allow_html=True)
+        
+        c2.write(f"**{row['descricao_acao']}** | {row['quem']} | **{dt_br}**")
+        if 'como' in row and row['como']:
+            c2.caption(f"🔧 **Como:** {row['como']}")
+        c2.caption(f"Status: {row['status']} | Prioridade: {row['prioridade']} | R$ {float(row['quanto_custa'] or 0):,.2f}")
+        if row['observacoes']: 
+            c2.info(f"💬 {row['observacoes']}")
+        
+        if c3.button("✏️", key=f"ed_{row['id_acao']}"):
+            st.session_state.edit_id = row['id_acao']
+            st.rerun()
+        
+        if c4.button("🗑️", key=f"btn_ex_{row['id_acao']}"):
+            st.session_state.confirmar_excluir = row['id_acao']
+            st.rerun()
+        
+        if st.session_state.confirmar_excluir == row['id_acao']:
+            card_container.warning(f"Excluir item {row['id_acao']}?")
+            ca, cb = card_container.columns(2)
+            if ca.button("✅ SIM", key=f"sim_{row['id_acao']}"):
+                executar_db("DELETE FROM Acoes WHERE id_acao=%s", (row['id_acao'],), False)
+                st.session_state.confirmar_excluir = None
                 st.cache_data.clear()
                 st.rerun()
-        
-        if st.session_state.edit_id: 
-            if st.button("❌ Cancelar Edição"):
-                st.session_state.edit_id = None
+            if cb.button("❌ NÃO", key=f"nao_{row['id_acao']}"):
+                st.session_state.confirmar_excluir = None
                 st.rerun()
+        card_container.divider()
+else:
+    tab_lista.info("Nenhuma ação cadastrada ou correspondente aos filtros.")
 
-    # FILTROS DE LISTAGEM ISOLADOS
-    st.subheader("📋 Ações e Prazos")
-    df_filtrado = df.copy()
+
+# ==============================================================================
+# 📊 CONTEÚDO DA ABA 2: ANÁLISE DE PERFORMANCE (SEM USO DE 'WITH')
+# ==============================================================================
+
+if df.empty:
+    tab_graficos.info("Sem dados suficientes cadastrados para gerar os gráficos.")
+else:
+    tab_graficos.subheader("📊 Indicadores da Lavo e Levo")
+    g1, g2 = tab_graficos.columns(2)
     
-    if not df.empty:
-        f1, f2 = st.columns(2)
-        with f1:
-            filtro_quem = st.multiselect("Filtrar por Responsável", options=list(df['quem'].unique()), default=[])
-        with f2:
-            filtro_status = st.multiselect("Filtrar por Status", options=list(df['status'].unique()), default=[])
-        
-        if filtro_quem:
-            df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)]
-        if filtro_status:
-            df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
-
-    # EXIBIÇÃO EM LISTA CARD POR CARD
-    if not df_filtrado.empty:
-        for _, row in df_filtrado.iterrows():
-            dt_br = pd.to_datetime(row['prazo']).strftime('%d/%m/%Y')
-            atraso = pd.to_datetime(row['prazo']).date() < hoje and row['status'] != 'Concluído'
-            cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
-            
-            with st.container():
-                c1, c2, c3, c4 = st.columns([0.02, 0.78, 0.1, 0.1])
-                c1.markdown(f"<div style='background-color:{cor}; height:95px; width:8px; border-radius:5px'></div>", unsafe_allow_html=True)
-                with c2:
-                    st.write(f"**{row['descricao_acao']}** | {row['quem']} | **{dt_br}**")
-                    if 'como' in row and row['como']:
-                        st.caption(f"🔧 **Como:** {row['como']}")
-                    st.caption(f"Status: {row['status']} | Prioridade: {row['prioridade']} | R$ {float(row['quanto_custa'] or 0):,.2f}")
-                    if row['observacoes']: st.info(f"💬 {row['observacoes']}")
-                
-                if c3.button("✏️", key=f"ed_{row['id_acao']}"):
-                    st.session_state.edit_id = row['id_acao']
-                    st.rerun()
-                
-                if c4.button("🗑️", key=f"btn_ex_{row['id_acao']}"):
-                    st.session_state.confirmar_excluir = row['id_acao']
-                
-                if st.session_state.confirmar_excluir == row['id_acao']:
-                    st.warning(f"Excluir item {row['id_acao']}?")
-                    ca, cb = st.columns(2)
-                    if ca.button("✅ SIM", key=f"sim_{row['id_acao']}"):
-                        executar_db("DELETE FROM Acoes WHERE id_acao=%s", (row['id_acao'],), False)
-                        st.session_state.confirmar_excluir = None
-                        st.cache_data.clear()
-                        st.rerun()
-                    if cb.button("❌ NÃO", key=f"nao_{row['id_acao']}"):
-                        st.session_state.confirmar_excluir = None
-                        st.rerun()
-                st.divider()
-    else:
-        st.info("Nenhuma ação cadastrada ou correspondente aos filtros.")
-
-# --- ABA DE GRÁFICOS (ALINHADA LINHA POR LINHA COM 4 ESPAÇOS ESTREITOS) ---
-with tab_graficos:
