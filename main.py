@@ -212,11 +212,6 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
                 executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
             st.rerun()
 
-if st.session_state.edit_id: 
-    if form_expander.button("❌ Cancelar Modo Edição", use_container_width=True):
-        st.session_state.edit_id = None
-        st.rerun()
-
 # FILTROS DE LISTAGEM ISOLADOS
 tab_lista.subheader("📋 Ações e Prazos")
 df_filtrado = df.copy()
@@ -232,3 +227,5 @@ if not df.empty:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
 
 # --- LISTA DE CONTROLE RÁPIDO ---
+if not df_filtrado.empty:
+    tab_lista.write("**Lista de Controle Rápido:**")
