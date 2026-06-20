@@ -118,7 +118,7 @@ if not st.session_state['logado']:
             if st.form_submit_button("Entrar no Sistema", use_container_width=True):
                 res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
                 if res and len(res) > 0:
-                    # CORREÇÃO CRUCIAL DO LOGIN: Lê o dicionário de dentro da lista retornada pelo banco
+                    # CORREÇÃO DEFINITIVA DO LOGIN: Acessa a posição [0] para extrair o dicionário interno
                     nivel_usuario = res[0].get('nivel', 'Comum')
                     st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
                     st.rerun()
@@ -156,7 +156,7 @@ dados_edit = None
 if st.session_state.edit_id:
     res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
     if res_e and len(res_e) > 0: 
-        # CORREÇÃO CRUCIAL DA EDIÇÃO: Extrai o dicionário da linha zero da lista do banco
+        # CORREÇÃO DEFINITIVA DA EDIÇÃO: Captura o dicionário interno usando índice [0]
         dados_edit = res_e[0]
 
 res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
