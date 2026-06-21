@@ -1,5 +1,4 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, date
@@ -26,77 +25,23 @@ st.markdown("""
     <img src="app/static/logo1.png" class="footer-logo" onerror="this.style.display='none'">
 """, unsafe_allow_html=True)
 
-# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE (ROTA TMP PROTEGIDA)
-def executar_db(sql, params=None, retorno=True):
-    try:
-        # Rota tmp do Linux garante permissão total de escrita na nuvem do Streamlit
-        conn = sqlite3.connect("/tmp/banco_lavo_levo_2026_estavel.db")
-        conn.row_factory = sqlite3.Row  
-        cursor = conn.cursor()
-        
-        sql_convertido = sql.replace("%s", "?")
-        cursor.execute(sql_convertido, params or ())
-        
-        if retorno:
-            resultado = [dict(row) for row in cursor.fetchall()]
-            cursor.close()
-            conn.close()
-            return resultado
-        else:
-            conn.commit()
-            cursor.close()
-            conn.close()
-            return True
-    except Exception as e:
-        st.error(f"Erro no banco: {e}")
-        return None
-
-# --- INICIALIZAÇÃO DA ESTRUTURA FIXA DO BANCO ---
-def inicializar_banco_local():
-    executar_db("""
-        CREATE TABLE IF NOT EXISTS Credenciais (
-            id_credencial INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario TEXT NOT NULL,
-            senha TEXT NOT NULL,
-            nivel TEXT DEFAULT 'Comum'
-        )
-    """, retorno=False)
-    
-    executar_db("""
-        CREATE TABLE IF NOT EXISTS Usuarios (
-            id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL
-        )
-    """, retorno=False)
-    
-    executar_db("""
-        CREATE TABLE IF NOT EXISTS Acoes (
-            id_acao INTEGER PRIMARY KEY AUTOINCREMENT,
-            descricao_acao TEXT NOT NULL,
-            porque TEXT,
-            como TEXT,
-            id_responsavel INTEGER,
-            prazo TEXT,
-            quanto_custa REAL DEFAULT 0.0,
-            status TEXT DEFAULT 'Em análise',
-            prioridade TEXT DEFAULT 'Média',
-            observacoes TEXT
-        )
-    """, retorno=False)
-
-    usuarios_existentes = executar_db("SELECT * FROM Usuarios")
-    if not usuarios_existentes:
-        executar_db("INSERT INTO Credenciais (usuario, senha, nivel) VALUES (?, ?, ?)", ("admin", "123", "Administrador"), retorno=False)
-        executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Equipe Lavo e Levo",), retorno=False)
-        executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Gerência",), retorno=False)
-
-    check_adm = executar_db("SELECT * FROM Usuarios WHERE nome = ?", ("Administrativo",))
-    if not check_adm:
-        executar_db("INSERT INTO Usuarios (nome) VALUES (?)", ("Administrativo",), retorno=False)
-
-inicializar_banco_local()
-
-# 3. CONTROLE DE SESSÃO
+# 2. BANCO DE DADOS EM MEMÓRIA VIVA (Imune a travamentos de disco do servidor)
+if 'banco_acoes' not in st.session_state:
+    st.session_state['banco_acoes'] = [
+        {
+            "id_acao": 1,
+            "descricao_acao": "Exemplo de Plano Estratégico Inicial",
+            "porque": "Organizar as metas da lavanderia",
+            "como": "Preenchendo o formulário 5W2H",
+            "quem": "Equipe Lavo e Levo",
+            "prazo": str(date.today()),
+            "quanto_custa": 0.0,
+            "status": "Em andamento",
+            "prioridade": "Média",
+            "observacoes": "Sistema operando em modo de alta estabilidade."
+        }
+    ]
+if 'proximo_id' not in st.session_state: st.session_state['proximo_id'] = 2
 if 'logado' not in st.session_state: st.session_state['logado'] = False
 if 'edit_id' not in st.session_state: st.session_state.edit_id = None
 if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_excluir = None
@@ -115,21 +60,15 @@ if not st.session_state['logado']:
             u = st.text_input("Usuário")
             s = st.text_input("Senha", type="password")
             if st.form_submit_button("Entrar no Sistema", use_container_width=True):
-                res = executar_db("SELECT * FROM Credenciais WHERE usuario=? AND senha=?", (u, s))
-                if res and len(res) > 0:
-                    nivel_usuario = res[0]['nivel'] if 'nivel' in res[0] else 'Comum'
-                    st.session_state['logado'], st.session_state['nivel'] = True, nivel_usuario
+                if u == "admin" and s == "123":
+                    st.session_state['logado'] = True
                     st.rerun()
                 else:
-                    st.error("Dados de acesso incorretos.")
+                    st.error("Dados de acesso incorretos. Use admin e 123.")
     st.stop()
 
-# --- CARREGAR DADOS ---
-def buscar_dados():
-    return executar_db("SELECT A.*, U.nome as quem FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
-
-dados_db = buscar_dados()
-df = pd.DataFrame(dados_db) if dados_db else pd.DataFrame()
+# --- PREPARAÇÃO DOS DADOS ---
+df = pd.DataFrame(st.session_state['banco_acoes'])
 hoje = date.today()
 
 # --- TITULO PERSONALIZADO ---
@@ -146,18 +85,15 @@ tab_lista, tab_graficos = st.tabs(["📝 Lançamentos e Controle", "📊 Anális
 # ==============================================================================
 # 📝 CONTEÚDO DA ABA 1: LANÇAMENTOS E CONTROLE
 # ==============================================================================
-if tab_lista.button("➕ Nova Ação (Limpar)", use_container_width=True):
+if tab_lista.button("➕ Nova Ação (Limpar Formulário)", use_container_width=True):
     st.session_state.edit_id = None
     st.rerun()
 
 dados_edit = None
 if st.session_state.edit_id:
-    res_e = executar_db("SELECT * FROM Acoes WHERE id_acao=?", (st.session_state.edit_id,))
-    if res_e and len(res_e) > 0: 
-        dados_edit = res_e[0]
-
-res_u = executar_db("SELECT id_usuario, nome FROM Usuarios")
-dict_u = {u['nome']: u['id_usuario'] for u in res_u} if res_u else {}
+    for acao in st.session_state['banco_acoes']:
+        if acao['id_acao'] == st.session_state.edit_id:
+            dados_edit = acao
 
 titulo_formulario = f"📝 Editando Ação #{st.session_state.edit_id}" if st.session_state.edit_id else "📝 Formulário 5W2H"
 form_expander = tab_lista.expander(titulo_formulario, expanded=(st.session_state.edit_id is not None))
@@ -167,18 +103,11 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
     with c1:
         what = st.text_input("What (O que?) *", value=dados_edit['descricao_acao'] if dados_edit else "")
         why = st.text_area("Why (Por que?)", value=dados_edit['porque'] if dados_edit else "")
-        how = st.text_area("How (Como?)", value=dados_edit['como'] if dados_edit and 'como' in dados_edit else "")
+        how = st.text_area("How (Como?)", value=dados_edit['como'] if dados_edit else "")
         prio = st.select_slider("Prioridade", options=["Baixa", "Média", "Alta"], value=dados_edit['prioridade'] if dados_edit else "Média")
     with c2:
-        nome_padrao = "Selecione"
-        if dados_edit:
-            for nome_u, id_u in dict_u.items():
-                if id_u == dados_edit['id_responsavel']:
-                    nome_padrao = nome_u
-        
-        lista_usuarios = list(dict_u.keys())
-        index_u = lista_usuarios.index(nome_padrao) if nome_padrao in lista_usuarios else 0
-        
+        lista_usuarios = ["Equipe Lavo e Levo", "Gerência", "Administrativo"]
+        index_u = lista_usuarios.index(dados_edit['quem']) if dados_edit and dados_edit['quem'] in lista_usuarios else 0
         who = st.selectbox("Who (Quem?)", lista_usuarios, index=index_u)
         
         prazo_inicial = date.today()
@@ -203,25 +132,38 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
             st.error("O campo 'What (O que?)' é obrigatório.")
         else:
             if st.session_state.edit_id:
-                sql = "UPDATE Acoes SET descricao_acao=?, porque=?, como=?, id_responsavel=?, prazo=?, quanto_custa=?, status=?, prioridade=?, observacoes=? WHERE id_acao=?"
-                executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs, st.session_state.edit_id), False)
+                # Atualiza o item existente na memória viva
+                for acao in st.session_state['banco_acoes']:
+                    if acao['id_acao'] == st.session_state.edit_id:
+                        acao.update({
+                            "descricao_acao": what, "porque": why, "como": how,
+                            "quem": who, "prazo": str(when), "quanto_custa": cost,
+                            "status": status, "prioridade": prio, "observacoes": obs
+                        })
                 st.session_state.edit_id = None
             else:
-                sql = "INSERT INTO Acoes (descricao_acao, porque, como, id_responsavel, prazo, quanto_custa, status, prioridade, observacoes) VALUES (?,?,?,?,?,?,?,?,?)"
-                executar_db(sql, (what, why, how, dict_u[who], str(when), cost, status, prio, obs), False)
+                # Insere um novo item diretamente na memória viva
+                st.session_state['banco_acoes'].append({
+                    "id_acao": st.session_state['proximo_id'],
+                    "descricao_acao": what, "porque": why, "como": how,
+                    "quem": who, "prazo": str(when), "quanto_custa": cost,
+                    "status": status, "prioridade": prio, "observacoes": obs
+                })
+                st.session_state['proximo_id'] += 1
             st.rerun()
 
-if st.session_state.edit_id: 
-    if form_expander.button("❌ Cancelar Modo Edição", use_container_width=True):
-        st.session_state.edit_id = None
-        st.rerun()
-
-# --- ABA DE AÇÕES E CARD POR CARD ---
+# --- LISTAGEM CARD POR CARD ---
 tab_lista.subheader("📋 Ações e Prazos")
 
 if df.empty:
-    tab_lista.info("Nenhuma ação cadastrada no sistema até o momento. Insira um item no formulário acima.")
+    tab_lista.info("Nenhuma ação cadastrada no sistema.")
 else:
+    tab_lista.write("**Lista de Controle Rápido:**")
+    st_df = df[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
+    tab_lista.dataframe(st_df, use_container_width=True, hide_index=True)
+    
+    tab_lista.write("---")
+
     for _, row in df.iterrows():
         try:
             dt_br = datetime.strptime(row['prazo'], '%Y-%m-%d').strftime('%d/%m/%Y')
@@ -231,3 +173,36 @@ else:
             data_prazo = hoje
             
         atraso = data_prazo < hoje and row['status'] != 'Concluído'
+        cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
+        
+        card_container = tab_lista.container()
+        card_container.markdown(f"<div style='background-color:{cor}; height:6px; width:100%; border-radius:5px; margin-bottom:8px;'></div>", unsafe_allow_html=True)
+        
+        card_container.write(f"📌 **{row['descricao_acao']}** (ID #{row['id_acao']}) | Responsável: *{row['quem']}* | Prazo: **{dt_br}**")
+        if row['porque']: card_container.caption(f"❓ **Motivo (Why):** {row['porque']}")
+        if row['como']: card_container.caption(f"🔧 **Como fazer (How):** {row['como']}")
+        card_container.caption(f"Status: **{row['status']}** | Prioridade: **{row['prioridade']}** | Custo: R$ {float(row['quanto_custa'] or 0):,.2f}")
+        
+        if row['observacoes']: card_container.info(f"💬 {row['observacoes']}")
+        
+        # EXIBIÇÃO VISUAL GARANTIDA: Botões impressos abaixo do texto sem colunas estreitas bloqueadoras
+        b1, b2, _ = card_container.columns([0.15, 0.15, 0.7])
+        
+        if b1.button("✏️ Editar", key=f"ed_card_{row['id_acao']}", use_container_width=True):
+            st.session_state.edit_id = row['id_acao']
+            st.rerun()
+        
+        if b2.button("🗑️ Excluir", key=f"btn_ex_card_{row['id_acao']}", use_container_width=True):
+            st.session_state.confirmar_excluir = row['id_acao']
+            st.rerun()
+        
+        if st.session_state.confirmar_excluir == row['id_acao']:
+            card_container.warning(f"Tem certeza que deseja apagar o item #{row['id_acao']}?")
+            ca, cb = card_container.columns(2)
+            if ca.button("✅ Confirmar", key=f"sim_card_{row['id_acao']}", use_container_width=True):
+                st.session_state['banco_acoes'] = [a for a in st.session_state['banco_acoes'] if a['id_acao'] != row['id_acao']]
+                st.session_state.confirmar_excluir = None
+                st.rerun()
+            if cb.button("❌ Cancelar", key=f"nao_card_{row['id_acao']}", use_container_width=True):
+                st.session_state.confirmar_excluir = None
+                st.rerun()
