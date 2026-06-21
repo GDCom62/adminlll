@@ -98,7 +98,7 @@ hoje = date.today()
 # --- TITULO PERSONALIZADO ---
 st.markdown("""
     <h1 style='text-align: center; color: #1E3A8A; padding-bottom: 5px;'>
-        🧺 PLANO ESTRATÉGICO DA LAVANDERIA LAVO E LEVO
+        🧺 PLANO DE AÇAO - Administrativo
     </h1>
     <p style='text-align: center; color: #6B7280; font-size: 1.1em;'>Gestão 5W2H e Controle de Performance</p>
     <hr style='border: 1px solid #3B82F6; margin-bottom: 30px;'>
