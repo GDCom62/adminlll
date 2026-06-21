@@ -29,7 +29,6 @@ st.markdown("""
 # 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
-        # ARQUIVO NOVO PARA FORÇAR A QUEBRA DE LOCK DO SERVIDOR
         conn = sqlite3.connect("banco_lavo_levo_final_2026.db")
         conn.row_factory = sqlite3.Row  
         cursor = conn.cursor()
@@ -124,7 +123,7 @@ if not st.session_state['logado']:
                     st.error("Dados de acesso incorretos.")
     st.stop()
 
-# --- CARREGAR DADOS ---
+# --- CARREGAR DADOS EM TEMPO REAL (Sem travar em cache antigo) ---
 def buscar_dados():
     return executar_db("SELECT A.*, U.nome as quem FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
 
@@ -216,11 +215,11 @@ if st.session_state.edit_id:
         st.session_state.edit_id = None
         st.rerun()
 
-# --- LISTA DE CONTROLE RÁPIDO E CARD POR CARD SEM FILTROS (LINHA 233 REMOVIDA) ---
+# --- LISTA DE CONTROLE RÁPIDO E RENDEREZACAO ---
 tab_lista.subheader("📋 Ações e Prazos")
 
 if df.empty:
-    tab_lista.info("Nenhuma ação cadastrada no sistema até o momento.")
+    tab_lista.info("Nenhuma ação cadastrada no sistema até o momento. Insira um item no formulário acima.")
 else:
     tab_lista.write("**Lista de Controle Rápido:**")
     st_df = df[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
