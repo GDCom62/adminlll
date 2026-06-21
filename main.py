@@ -26,10 +26,11 @@ st.markdown("""
     <img src="app/static/logo1.png" class="footer-logo" onerror="this.style.display='none'">
 """, unsafe_allow_html=True)
 
-# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
+# 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE (ROTA TMP PROTEGIDA)
 def executar_db(sql, params=None, retorno=True):
     try:
-        conn = sqlite3.connect("banco_lavo_levo_final_2026.db")
+        # Rota tmp do Linux garante permissão total de escrita na nuvem do Streamlit
+        conn = sqlite3.connect("/tmp/banco_lavo_levo_2026_estavel.db")
         conn.row_factory = sqlite3.Row  
         cursor = conn.cursor()
         
@@ -215,13 +216,12 @@ if st.session_state.edit_id:
         st.session_state.edit_id = None
         st.rerun()
 
-# --- ABA DE AÇÕES E CARD POR CARD (LAYOUT LINEAR SEGURO) ---
+# --- ABA DE AÇÕES E CARD POR CARD ---
 tab_lista.subheader("📋 Ações e Prazos")
 
 if df.empty:
     tab_lista.info("Nenhuma ação cadastrada no sistema até o momento. Insira um item no formulário acima.")
 else:
-    # Laço corrido dos cartões sem divisões complexas de colunas laterais
     for _, row in df.iterrows():
         try:
             dt_br = datetime.strptime(row['prazo'], '%Y-%m-%d').strftime('%d/%m/%Y')
