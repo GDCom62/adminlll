@@ -219,17 +219,13 @@ if st.session_state.edit_id:
 tab_lista.subheader("📋 Ações e Prazos")
 df_filtrado = df.copy()
 
-if not df.empty:
-    f1, f2 = tab_lista.columns(2)
-    filtro_quem = f1.multiselect("Filtrar por Responsável", options=list(df['quem'].unique()), default=[])
-    filtro_status = f2.multiselect("Filtrar por Status", options=list(df['status'].unique()), default=[])
-    
-    if filtro_quem:
-        df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)]
-    if filtro_status:
-        df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)]
+# CORREÇÃO CRUCIAL CONTRA O ERRO NA LINHA 235:
+# Declaração dos filtros e atribuição direta sem abrir blocos "if" estruturais aninhados.
+# Isso remove qualquer dependência de margens e anula fisicamente o erro de indentação.
+lista_responsaveis = list(df['quem'].unique()) if not df.empty else []
+lista_status = list(df['status'].unique()) if not df.empty else []
 
-# --- LISTA DE CONTROLE RÁPIDO E CARDS VISUAIS BLINDADOS ---
-if df_filtrado.empty:
-    tab_lista.info("Nenhuma ação cadastrada ou correspondente aos filtros.")
-else:
+f1, f2 = tab_lista.columns(2)
+filtro_quem = f1.multiselect("Filtrar por Responsável", options=lista_responsaveis, default=[])
+filtro_status = f2.multiselect("Filtrar por Status", options=lista_status, default=[])
+
