@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime, date
 
 # 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(page_title="Lavo e Levo - Plano de Açao", layout="wide")
+st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
 
 # Estilização em CSS para fixar o logo1.png no rodapé direito inferior da tela
 st.markdown("""
@@ -77,7 +77,6 @@ inicializar_banco_fisico()
 # 3. CONTROLE DE SESSÃO
 if 'logado' not in st.session_state: st.session_state['logado'] = False
 if 'edit_id' not in st.session_state: st.session_state.edit_id = None
-if 'confirmar_excluir' not in st.session_state: st.session_state.confirmar_excluir = None
 
 # --- TELA DE LOGIN ---
 if not st.session_state['logado']:
@@ -100,28 +99,15 @@ if not st.session_state['logado']:
                     st.error("Dados de acesso incorretos. Use admin e 123.")
     st.stop()
 
-# --- REFRESH E SALVAMENTO EXTERNO DOS BOTÕES PARA EVITAR TRAVAMENTOS ---
-if st.session_state.get('btn_click_editar'):
-    st.session_state.edit_id = st.session_state.btn_click_editar
-    del st.session_state['btn_click_editar']
-    st.rerun()
-
-if st.session_state.get('btn_click_excluir'):
-    st.session_state.confirmar_excluir = st.session_state.btn_click_excluir
-    del st.session_state['btn_click_excluir']
-    st.rerun()
-
-# --- SINCRO DA MEMÓRIA VIVA ---
+# --- CARREGAR DADOS DO BANCO ---
 dados_salvos = executar_db("SELECT * FROM Acoes ORDER BY prazo ASC")
-st.session_state['banco_acoes'] = dados_salvos if dados_salvos else []
-
-df = pd.DataFrame(st.session_state['banco_acoes'])
+df = pd.DataFrame(dados_salvos) if dados_salvos else pd.DataFrame()
 hoje = date.today()
 
 # --- TITULO PERSONALIZADO ---
 st.markdown("""
     <h1 style='text-align: center; color: #1E3A8A; padding-bottom: 5px;'>
-        🧺 PLANO DE AÇAO - Administrativo
+        🧺 PLANO ESTRATÉGICO DA LAVANDERIA LAVO E LEVO
     </h1>
     <p style='text-align: center; color: #6B7280; font-size: 1.1em;'>Gestão 5W2H e Controle de Performance</p>
     <hr style='border: 1px solid #3B82F6; margin-bottom: 30px;'>
@@ -137,8 +123,8 @@ if tab_lista.button("➕ Nova Ação (Limpar Formulário)", use_container_width=
     st.rerun()
 
 dados_edit = None
-if st.session_state.edit_id:
-    for acao in st.session_state['banco_acoes']:
+if st.session_state.edit_id and dados_salvos:
+    for acao in dados_salvos:
         if acao['id_acao'] == st.session_state.edit_id:
             dados_edit = acao
 
@@ -190,26 +176,40 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
                     INSERT INTO Acoes (descricao_acao, porque, como, quem, prazo, quanto_custa, status, prioridade, observacoes)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
-                executar_db(sql, (what, why, how, who, str(when), cost, status, prio, obs), retorno=False)
+                executar_db(sql, (what, why, how, who, str(when), cost, status, prio, obs), False)
             st.rerun()
 
-if st.session_state.edit_id: 
-    if form_expander.button("❌ Cancelar Modo Edição", use_container_width=True):
-        st.session_state.edit_id = None
-        st.rerun()
-
-# --- LISTAGEM CARD POR CARD ---
+# --- PAINEL DE CONTROLE FIXO SUPERIOR ---
 tab_lista.subheader("📋 Ações e Prazos")
 
 if df.empty:
     tab_lista.info("Nenhuma ação cadastrada no sistema.")
 else:
-    tab_lista.write("📊 **Lista de Controle Rápido:**")
+    # Gerenciador de ações centralizado para evitar bugs de loop
+    st.markdown("### ⚙️ Painel de Manutenção de Ações")
+    c_id, c_ed, c_ex = tab_lista.columns([0.4, 0.3, 0.3])
+    
+    lista_ids = df['id_acao'].tolist()
+    id_selecionado = c_id.selectbox("Escolha o número do ID que deseja alterar ou apagar:", lista_ids)
+    
+    if c_ed.button("✏️ Editar ID Selecionado", use_container_width=True):
+        st.session_state.edit_id = id_selecionado
+        st.rerun()
+        
+    if c_ex.button("🗑️ Excluir ID Selecionado", use_container_width=True):
+        executar_db("DELETE FROM Acoes WHERE id_acao=?", (id_selecionado,), retorno=False)
+        st.success(f"Item #{id_selecionado} removido com sucesso!")
+        st.rerun()
+        
+    tab_lista.markdown("---")
+    
+    tab_lista.write("📊 **Lista de Controle Cadastrada:**")
     st_df = df[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
     tab_lista.dataframe(st_df, use_container_width=True, hide_index=True)
     
     tab_lista.write("---")
 
+    # Amostragem visual em formato de cards limpos (sem botões que causam bugs)
     for _, row in df.iterrows():
         try:
             dt_br = datetime.strptime(row['prazo'], '%Y-%m-%d').strftime('%d/%m/%Y')
@@ -224,6 +224,5 @@ else:
         card_container = tab_lista.container()
         card_container.markdown(f"<div style='background-color:{cor}; height:6px; width:100%; border-radius:5px; margin-bottom:8px;'></div>", unsafe_allow_html=True)
         
-        card_container.write(f"📌 **{row['descricao_acao']}** (ID #{row['id_acao']}) | Responsável: *{row['quem']}* | Prazo: **{dt_br}**")
+        card_container.write(f"📌 **[ID #{row['id_acao']}] - {row['descricao_acao']}** | Responsável: *{row['quem']}* | Prazo: **{dt_br}**")
         if row['porque']: card_container.caption(f"❓ **Motivo (Why):** {row['porque']}")
-        if row['como']: card_container.caption(f"🔧 **Como fazer (How):** {row['como']}")
