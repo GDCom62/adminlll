@@ -123,7 +123,7 @@ if not st.session_state['logado']:
                     st.error("Dados de acesso incorretos.")
     st.stop()
 
-# --- CARREGAR DADOS EM TEMPO REAL (Sem travar em cache antigo) ---
+# --- CARREGAR DADOS ---
 def buscar_dados():
     return executar_db("SELECT A.*, U.nome as quem FROM Acoes A JOIN Usuarios U ON A.id_responsavel = U.id_usuario ORDER BY A.prazo ASC")
 
@@ -215,16 +215,19 @@ if st.session_state.edit_id:
         st.session_state.edit_id = None
         st.rerun()
 
-# --- LISTA DE CONTROLE RÁPIDO E RENDEREZACAO ---
+# --- ABA DE AÇÕES E CARD POR CARD (LAYOUT LINEAR SEGURO) ---
 tab_lista.subheader("📋 Ações e Prazos")
 
 if df.empty:
     tab_lista.info("Nenhuma ação cadastrada no sistema até o momento. Insira um item no formulário acima.")
 else:
-    tab_lista.write("**Lista de Controle Rápido:**")
-    st_df = df[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
-    tab_lista.dataframe(st_df, use_container_width=True, hide_index=True)
-    
-    col_sel, col_btn_ed, col_btn_ex = tab_lista.columns([0.4, 0.3, 0.3])
-    id_selecionado = col_sel.selectbox("Selecione o ID de uma ação para alterar ou remover:", df['id_acao'].tolist(), key="select_manutencao_tabela")
-    
+    # Laço corrido dos cartões sem divisões complexas de colunas laterais
+    for _, row in df.iterrows():
+        try:
+            dt_br = datetime.strptime(row['prazo'], '%Y-%m-%d').strftime('%d/%m/%Y')
+            data_prazo = datetime.strptime(row['prazo'], '%Y-%m-%d').date()
+        except:
+            dt_br = str(row['prazo'])
+            data_prazo = hoje
+            
+        atraso = data_prazo < hoje and row['status'] != 'Concluído'
