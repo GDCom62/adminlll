@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime, date
 
 # 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
+st.set_page_config(page_title="Lavo e Levo - Plano de Açao", layout="wide")
 
 # Estilização em CSS para fixar o logo1.png no rodapé direito inferior da tela
 st.markdown("""
@@ -100,6 +100,17 @@ if not st.session_state['logado']:
                     st.error("Dados de acesso incorretos. Use admin e 123.")
     st.stop()
 
+# --- REFRESH E SALVAMENTO EXTERNO DOS BOTÕES PARA EVITAR TRAVAMENTOS ---
+if st.session_state.get('btn_click_editar'):
+    st.session_state.edit_id = st.session_state.btn_click_editar
+    del st.session_state['btn_click_editar']
+    st.rerun()
+
+if st.session_state.get('btn_click_excluir'):
+    st.session_state.confirmar_excluir = st.session_state.btn_click_excluir
+    del st.session_state['btn_click_excluir']
+    st.rerun()
+
 # --- SINCRO DA MEMÓRIA VIVA ---
 dados_salvos = executar_db("SELECT * FROM Acoes ORDER BY prazo ASC")
 st.session_state['banco_acoes'] = dados_salvos if dados_salvos else []
@@ -110,7 +121,7 @@ hoje = date.today()
 # --- TITULO PERSONALIZADO ---
 st.markdown("""
     <h1 style='text-align: center; color: #1E3A8A; padding-bottom: 5px;'>
-        🧺 PLANO ESTRATÉGICO DA LAVANDERIA LAVO E LEVO
+        🧺 PLANO DE AÇAO - Administrativo
     </h1>
     <p style='text-align: center; color: #6B7280; font-size: 1.1em;'>Gestão 5W2H e Controle de Performance</p>
     <hr style='border: 1px solid #3B82F6; margin-bottom: 30px;'>
@@ -216,10 +227,3 @@ else:
         card_container.write(f"📌 **{row['descricao_acao']}** (ID #{row['id_acao']}) | Responsável: *{row['quem']}* | Prazo: **{dt_br}**")
         if row['porque']: card_container.caption(f"❓ **Motivo (Why):** {row['porque']}")
         if row['como']: card_container.caption(f"🔧 **Como fazer (How):** {row['como']}")
-        card_container.caption(f"Status: **{row['status']}** | Prioridade: **{row['prioridade']}** | Custo: R$ {float(row['quanto_custa'] or 0):,.2f}")
-        
-        if row['observacoes']: card_container.info(f"💬 {row['observacoes']}")
-        
-        # EXIBIÇÃO VISUAL BLINDADA E ADAPTADA AO BANCO DE DADOS FISICO
-        b1, b2, _ = card_container.columns([0.15, 0.15, 0.7])
-        
