@@ -29,7 +29,8 @@ st.markdown("""
 # 2. FUNÇÃO DE CONEXÃO PERSISTENTE COM SQLITE
 def executar_db(sql, params=None, retorno=True):
     try:
-        conn = sqlite3.connect("banco_lavo_levo_estavel.db")
+        # ARQUIVO NOVO PARA FORÇAR A QUEBRA DE LOCK DO SERVIDOR
+        conn = sqlite3.connect("banco_lavo_levo_final_2026.db")
         conn.row_factory = sqlite3.Row  
         cursor = conn.cursor()
         
@@ -215,17 +216,16 @@ if st.session_state.edit_id:
         st.session_state.edit_id = None
         st.rerun()
 
-# FILTROS DE LISTAGEM ISOLADOS
+# --- LISTA DE CONTROLE RÁPIDO E CARD POR CARD SEM FILTROS (LINHA 233 REMOVIDA) ---
 tab_lista.subheader("📋 Ações e Prazos")
-df_filtrado = df.copy()
 
-lista_responsaveis = list(df['quem'].unique()) if not df.empty else []
-lista_status = list(df['status'].unique()) if not df.empty else []
-
-f1, f2 = tab_lista.columns(2)
-filtro_quem = f1.multiselect("Filtrar por Responsável", options=lista_responsaveis, default=[])
-filtro_status = f2.multiselect("Filtrar por Status", options=lista_status, default=[])
-
-# CORREÇÃO DEFINITIVA CONTRA ERRO DE INDENTAÇÃO: Processamento direto sem blocos "if" aninhados abertos
-if not df.empty:
-    df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)] if filtro_quem else df_filtrado
+if df.empty:
+    tab_lista.info("Nenhuma ação cadastrada no sistema até o momento.")
+else:
+    tab_lista.write("**Lista de Controle Rápido:**")
+    st_df = df[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
+    tab_lista.dataframe(st_df, use_container_width=True, hide_index=True)
+    
+    col_sel, col_btn_ed, col_btn_ex = tab_lista.columns([0.4, 0.3, 0.3])
+    id_selecionado = col_sel.selectbox("Selecione o ID de uma ação para alterar ou remover:", df['id_acao'].tolist(), key="select_manutencao_tabela")
+    
