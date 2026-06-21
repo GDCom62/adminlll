@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import sqlite3
+import json
+import os
 from datetime import datetime, date
 import io
 
@@ -27,53 +28,43 @@ st.markdown("""
     <img src="app/static/logo1.png" class="footer-logo" onerror="this.style.display='none'">
 """, unsafe_allow_html=True)
 
-# 2. GERENCIAMENTO COMPLETO E PERSISTENTE DO BANCO DE DADOS LOCAL
-def executar_db(sql, params=None, retorno=True):
+# 2. SISTEMA DE ARQUIVO TEXTO SEGURO (Substitui o SQLite instável da nuvem)
+ARQUIVO_BANCO = "plano_de_acao_seguro.json"
+
+def carregar_dados_json():
+    # Se o arquivo não existir, cria um lote padrão inicial estável
+    if not os.path.exists(ARQUIVO_BANCO):
+        dados_iniciais = [{
+            "id_acao": 1,
+            "descricao_acao": "Exemplo de Plano Estratégico Inicial",
+            "porque": "Organizar as metas da lavanderia",
+            "como": "Preenchendo o formulário 5W2H",
+            "quem": "Equipe Lavo e Levo",
+            "prazo": str(date.today()),
+            "quanto_custa": 0.0,
+            "status": "Em andamento",
+            "prioridade": "Média",
+            "observacoes": "Sistema operando em modo de persistência contínua por texto seguro."
+        }]
+        salvar_dados_json(dados_iniciais)
+        return dados_iniciais
     try:
-        conn = sqlite3.connect("lavo_levo_permanente.db")
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute(sql, params or ())
-        if retorno:
-            resultado = [dict(row) for row in cursor.fetchall()]
-            cursor.close()
-            conn.close()
-            return resultado
-        else:
-            conn.commit()
-            cursor.close()
-            conn.close()
-            return True
+        with open(ARQUIVO_BANCO, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def salvar_dados_json(dados):
+    try:
+        with open(ARQUIVO_BANCO, "w", encoding="utf-8") as f:
+            json.dump(dados, f, ensure_ascii=False, indent=4)
+        return True
     except Exception as e:
-        st.error(f"Erro ao acessar o banco físico: {e}")
-        return None
+        st.error(f"Erro físico de gravação: {e}")
+        return False
 
-def inicializar_banco_fisico():
-    executar_db("""
-        CREATE TABLE IF NOT EXISTS Acoes (
-            id_acao INTEGER PRIMARY KEY AUTOINCREMENT,
-            descricao_acao TEXT NOT NULL,
-            porque TEXT,
-            como TEXT,
-            quem TEXT,
-            prazo TEXT,
-            quanto_custa REAL,
-            status TEXT,
-            prioridade TEXT,
-            observacoes TEXT
-        )
-    """, retorno=False)
-    
-    dados = executar_db("SELECT * FROM Acoes")
-    if not dados:
-        executar_db("""
-            INSERT INTO Acoes (descricao_acao, porque, como, quem, prazo, quanto_custa, status, prioridade, observacoes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, ("Exemplo de Plano Estratégico Inicial", "Organizar as metas da lavanderia", 
-              "Preenchendo o formulário 5W2H", "Equipe Lavo e Levo", str(date.today()), 0.0, "Em andamento", "Média", 
-              "Sistema operando em modo de alta estabilidade e salvo no banco físico."), retorno=False)
-
-inicializar_banco_fisico()
+# Inicializa o banco de dados em texto estável
+banco_dados_texto = carregar_dados_json()
 
 # 3. CONTROLE DE SESSÃO
 if 'logado' not in st.session_state: st.session_state['logado'] = False
@@ -100,15 +91,14 @@ if not st.session_state['logado']:
                     st.error("Dados de acesso incorretos. Use admin e 123.")
     st.stop()
 
-# --- CARREGAR DADOS DO BANCO ---
-dados_salvos = executar_db("SELECT * FROM Acoes ORDER BY prazo ASC")
-df = pd.DataFrame(dados_salvos) if dados_salvos else pd.DataFrame()
+# --- PREPARAÇÃO DAS TABELAS VISUAIS ---
+df = pd.DataFrame(banco_dados_texto)
 hoje = date.today()
 
 # --- TITULO PERSONALIZADO ---
 st.markdown("""
     <h1 style='text-align: center; color: #1E3A8A; padding-bottom: 5px;'>
-        🧺 PLANO DE AÇAO - Administrativo
+        🧺 PLANO ESTRATÉGICO DA LAVANDERIA LAVO E LEVO
     </h1>
     <p style='text-align: center; color: #6B7280; font-size: 1.1em;'>Gestão 5W2H e Controle de Performance</p>
     <hr style='border: 1px solid #3B82F6; margin-bottom: 30px;'>
@@ -124,8 +114,8 @@ if tab_lista.button("➕ Nova Ação (Limpar Formulário)", use_container_width=
     st.rerun()
 
 dados_edit = None
-if st.session_state.edit_id and dados_salvos:
-    for acao in dados_salvos:
+if st.session_state.edit_id:
+    for acao in banco_dados_texto:
         if acao['id_acao'] == st.session_state.edit_id:
             dados_edit = acao
 
@@ -166,18 +156,26 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
             st.error("O campo 'What (O que?)' é obrigatório.")
         else:
             if st.session_state.edit_id:
-                sql = """
-                    UPDATE Acoes SET descricao_acao=?, porque=?, como=?, quem=?, prazo=?, quanto_custa=?, status=?, prioridade=?, observacoes=?
-                    WHERE id_acao=?
-                """
-                executar_db(sql, (what, why, how, who, str(when), cost, status, prio, obs, st.session_state.edit_id), retorno=False)
+                # Altera o item no banco de texto seguro
+                for acao in banco_dados_texto:
+                    if acao['id_acao'] == st.session_state.edit_id:
+                        acao.update({
+                            "descricao_acao": what, "porque": why, "como": how,
+                            "quem": who, "prazo": str(when), "quanto_custa": cost,
+                            "status": status, "prioridade": prio, "observacoes": obs
+                        })
+                salvar_dados_json(banco_dados_texto)
                 st.session_state.edit_id = None
             else:
-                sql = """
-                    INSERT INTO Acoes (descricao_acao, porque, como, quem, prazo, quanto_custa, status, prioridade, observacoes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """
-                executar_db(sql, (what, why, how, who, str(when), cost, status, prio, obs), False)
+                # Determina o próximo ID de forma incremental
+                novo_id = max([a['id_acao'] for a in banco_dados_texto]) + 1 if banco_dados_texto else 1
+                banco_dados_texto.append({
+                    "id_acao": novo_id,
+                    "descricao_acao": what, "porque": why, "como": how,
+                    "quem": who, "prazo": str(when), "quanto_custa": cost,
+                    "status": status, "prioridade": prio, "observacoes": obs
+                })
+                salvar_dados_json(banco_dados_texto)
             st.rerun()
 
 # --- PAINEL DE CONTROLE FIXO SUPERIOR ---
@@ -197,7 +195,8 @@ else:
         st.rerun()
         
     if c_ex.button("🗑️ Excluir ID Selecionado", use_container_width=True):
-        executar_db("DELETE FROM Acoes WHERE id_acao=?", (id_selecionado,), retorno=False)
+        banco_dados_texto = [a for a in banco_dados_texto if a['id_acao'] != id_selecionado]
+        salvar_dados_json(banco_dados_texto)
         st.success(f"Item #{id_selecionado} removido com sucesso!")
         st.rerun()
         
