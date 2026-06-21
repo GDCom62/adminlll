@@ -226,8 +226,6 @@ f1, f2 = tab_lista.columns(2)
 filtro_quem = f1.multiselect("Filtrar por Responsável", options=lista_responsaveis, default=[])
 filtro_status = f2.multiselect("Filtrar por Status", options=lista_status, default=[])
 
-df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)] if filtro_quem else df_filtrado
-df_filtrado = df_filtrado[df_filtrado['status'].isin(filtro_status)] if filtro_status else df_filtrado
-
-# --- LISTA DE CONTROLE RÁPIDO ---
-if df_filtrado.empty:
+# CORREÇÃO DEFINITIVA CONTRA ERRO DE INDENTAÇÃO: Processamento direto sem blocos "if" aninhados abertos
+if not df.empty:
+    df_filtrado = df_filtrado[df_filtrado['quem'].isin(filtro_quem)] if filtro_quem else df_filtrado
