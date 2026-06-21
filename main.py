@@ -29,7 +29,6 @@ st.markdown("""
 # 2. GERENCIAMENTO COMPLETO E PERSISTENTE DO BANCO DE DADOS LOCAL
 def executar_db(sql, params=None, retorno=True):
     try:
-        # Criado na pasta local do projeto para garantir persistência contínua na nuvem
         conn = sqlite3.connect("lavo_levo_permanente.db")
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -64,7 +63,6 @@ def inicializar_banco_fisico():
         )
     """, retorno=False)
     
-    # Se o banco físico estiver zerado, insere o item de exemplo inicial
     dados = executar_db("SELECT * FROM Acoes")
     if not dados:
         executar_db("""
@@ -102,7 +100,7 @@ if not st.session_state['logado']:
                     st.error("Dados de acesso incorretos. Use admin e 123.")
     st.stop()
 
-# --- SINCRO DA MEMÓRIA VIVA COM O BANCO DE DADOS FÍSICO ---
+# --- SINCRO DA MEMÓRIA VIVA ---
 dados_salvos = executar_db("SELECT * FROM Acoes ORDER BY prazo ASC")
 st.session_state['banco_acoes'] = dados_salvos if dados_salvos else []
 
@@ -170,7 +168,6 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
             st.error("O campo 'What (O que?)' é obrigatório.")
         else:
             if st.session_state.edit_id:
-                # GRAVAÇÃO FÍSICA: Atualiza o item no banco de dados SQLite permanente
                 sql = """
                     UPDATE Acoes SET descricao_acao=?, porque=?, como=?, quem=?, prazo=?, quanto_custa=?, status=?, prioridade=?, observacoes=?
                     WHERE id_acao=?
@@ -178,7 +175,6 @@ with form_expander.form("form_5w2h", clear_on_submit=True):
                 executar_db(sql, (what, why, how, who, str(when), cost, status, prio, obs, st.session_state.edit_id), retorno=False)
                 st.session_state.edit_id = None
             else:
-                # GRAVAÇÃO FÍSICA: Insere o novo registro dentro do banco de dados SQLite permanente
                 sql = """
                     INSERT INTO Acoes (descricao_acao, porque, como, quem, prazo, quanto_custa, status, prioridade, observacoes)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -220,3 +216,10 @@ else:
         card_container.write(f"📌 **{row['descricao_acao']}** (ID #{row['id_acao']}) | Responsável: *{row['quem']}* | Prazo: **{dt_br}**")
         if row['porque']: card_container.caption(f"❓ **Motivo (Why):** {row['porque']}")
         if row['como']: card_container.caption(f"🔧 **Como fazer (How):** {row['como']}")
+        card_container.caption(f"Status: **{row['status']}** | Prioridade: **{row['prioridade']}** | Custo: R$ {float(row['quanto_custa'] or 0):,.2f}")
+        
+        if row['observacoes']: card_container.info(f"💬 {row['observacoes']}")
+        
+        # EXIBIÇÃO VISUAL BLINDADA E ADAPTADA AO BANCO DE DADOS FISICO
+        b1, b2, _ = card_container.columns([0.15, 0.15, 0.7])
+        
