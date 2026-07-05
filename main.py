@@ -106,14 +106,16 @@ with col_log:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# Buscar dados do banco Supabase
+# Buscar dados do banco Supabase (Corrigido para novas versões)
 acoes = []
 try:
     supabase = get_supabase_client()
-    resposta = supabase.table('"Acoes"').select("*").order("prazo", ascending=True).execute()
+    # Em vez de ascending=True, usamos desc=False para ordem crescente
+    resposta = supabase.table('"Acoes"').select("*").order("prazo", desc=False).execute()
     acoes = resposta.data
 except Exception as e:
     st.error(f"Erro de conexão com o Supabase: {e}")
+
 
 # --- INDICADORES GRÁFICOS (PIZZA DINÂMICA) ---
 st.write("---")
