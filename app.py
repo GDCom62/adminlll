@@ -117,20 +117,36 @@ try:
 except Exception as e:
     st.error(f"Erro de conexão com o Supabase: {e}")
 
-# --- INDICADORES GRÁFICOS (PIZZA NATIVA) ---
+# --- INDICADORES GRÁFICOS (PIZZA CORRIGIDA) ---
 st.write("---")
 st.subheader("📊 Distribuição de Status (Monitoramento)")
 
-status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
+# Criamos um dicionário padrão com letras minúsculas para comparar sem erro
+status_contagem = {"não iniciado": 0, "em andamento": 0, "concluído": 0}
+
 if acoes:
     for a in acoes:
-        status_atual = a.get('status', 'Não Iniciado')
-        if status_atual in status_contagem:
-            status_contagem[status_atual] += 1
+        # Pegamos o status, removemos espaços extras e transformamos em minúsculo
+        status_atual = str(a.get('status', 'não iniciado')).strip().lower()
+        
+        # Correção para o caso de o texto ter variação de acentuação no banco
+        if "andamento" in status_atual:
+            status_contagem["em andamento"] += 1
+        elif "concluido" in status_atual or "concluído" in status_atual:
+            status_contagem["concluído"] += 1
+        else:
+            status_contagem["não iniciado"] += 1
 
-    df_pizza = pd.DataFrame(list(status_contagem.items()), columns=["Status", "Quantidade"])
+    # Formatamos os nomes de volta para a exibição no gráfico
+    dados_formatados = {
+        "Não Iniciado": status_contagem["não iniciado"],
+        "Em Andamento": status_contagem["em andamento"],
+        "Concluído": status_contagem["concluído"]
+    }
+
+    df_pizza = pd.DataFrame(list(dados_formatados.items()), columns=["Status", "Quantidade"])
     
-    # Gera a pizza de forma nativa e limpa se houver dados
+    # Se a soma for maior que zero, exibe o gráfico nativo Altair (sem risco de erro de pip)
     if df_pizza["Quantidade"].sum() > 0:
         import altair as alt
         
@@ -138,14 +154,17 @@ if acoes:
             theta=alt.Theta(field="Quantidade", type="quantitative"),
             color=alt.Color(field="Status", type="nominal", scale=alt.Scale(
                 domain=['Não Iniciado', 'Em Andamento', 'Concluído'],
-                range=['#ff9999', '#66b3ff', '#99ff99']
+                range=['#ff9999', '#66b3ff', '#99ff99'] # Cores estéticas
             )),
             tooltip=['Status', 'Quantidade']
         ).properties(width=400, height=400)
         
         st.altair_chart(grafico_pizza, use_container_width=True)
     else:
-        st.info("Adicione ações para visualizar o gráfico em pizza.")
+        # Se entrar aqui, significa que a lista 'acoes' está vazia ou zerada
+        st.warning("⚠️ O gráfico não apareceu porque o sistema não encontrou nenhuma ação cadastrada na tabela para contabilizar.")
+else:
+    st.info("💡 Nenhuma ação encontrada no banco de dados. Cadastre uma ação abaixo para ativar o gráfico.")
 
 # --- LISTAGEM DOS ITENS SALVOS ---
 st.write("---")
