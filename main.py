@@ -3,28 +3,14 @@ import pandas as pd
 import base64
 import os
 import io
-import matplotlib.pyplot as plt # Nova biblioteca para o gráfico de pizza
+import plotly.express as px  # Biblioteca nativa e super estável para o gráfico
 from supabase import create_client, Client
 
 # Configuração da página Streamlit
 st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 
-# --- TESTE FORÇADO DE GRÁFICO (COLE LOGO ABAIXO DO ST.TITLE) ---
-import plotly.express as px
-import pandas as pd
-
-st.write("🔄 Executando teste forçado do gráfico...")
-dados_teste = pd.DataFrame({
-    "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
-    "Quantidade": [2, 5, 3]
-})
-
-fig_teste = px.pie(dados_teste, values="Quantidade", names="Status", hole=0.4)
-st.plotly_chart(fig_teste)
-st.write("✅ Linha após o gráfico de teste")
-# --------------------------------------------------------------
-
 # CONEXÃO DIRETA COM O SUPABASE
+# Coloque aqui as suas credenciais reais do Supabase
 SUPABASE_URL = "https://supabase.co"
 SUPABASE_KEY = "sua-chave-anonima-longa-aqui"
 
@@ -37,13 +23,8 @@ def fazer_upload_storage(arquivo_upload):
         try:
             supabase = get_supabase_client()
             bytes_data = arquivo_upload.getvalue()
-            # Nome único para o arquivo
             nome_arquivo = f"{pd.Timestamp.now().strftime('%Y%m%d%H%M%S')}_{arquivo_upload.name}"
-            
-            # Upload para o bucket 'arquivos_acoes'
             supabase.storage.from_("arquivos_acoes").upload(nome_arquivo, bytes_data)
-            
-            # Pega a URL pública do arquivo
             url_publica = supabase.storage.from_("arquivos_acoes").get_public_url(nome_arquivo)
             return url_publica
         except Exception as e:
@@ -55,7 +36,6 @@ def fazer_upload_storage(arquivo_upload):
 def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, url_arq):
     try:
         supabase = get_supabase_client()
-        
         dados_acao = {
             "descricao_acao": descricao,
             "porque": v_porque,
@@ -69,15 +49,15 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         }
         
         if id_limpo and id_limpo.isdigit():
-            resposta = supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
+            supabase.table('"Acoes"').update(dados_acao).eq("id_acao", int(id_limpo)).execute()
         else:
-            resposta = supabase.table("Acoes").insert(dados_acao).execute()
+            supabase.table('"Acoes"').insert(dados_acao).execute()
             
         return True, "Operação realizada com sucesso!"
     except Exception as e:
         return False, f"Erro ao salvar no Supabase: {str(e)}"
 
-# Inicializa o estado de login e edição
+# Inicializa os estados da sessão
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 if 'edit_item' not in st.session_state:
@@ -101,7 +81,6 @@ if not st.session_state['logado']:
         if st.button("Entrar", use_container_width=True, key="btn_entrar"):
             try:
                 supabase = get_supabase_client()
-                # Autenticação real na API do Supabase
                 auth_res = supabase.auth.sign_in_with_password({"email": email, "password": senha})
                 if auth_res.user:
                     st.session_state['logado'] = True
@@ -117,35 +96,33 @@ with col_tit:
 with col_log:
     st.write("<br>", unsafe_allow_html=True)
     if st.button("Sair (Logout)", use_container_width=True, key="btn_logout"):
-        supabase = get_supabase_client()
-        supabase.auth.sign_out() # Desconecta da sessão real
+        try:
+            supabase = get_supabase_client()
+            supabase.auth.sign_out()
+        except Exception:
+            pass
         st.session_state['logado'] = False
         st.session_state['edit_item'] = None
         st.rerun()
 
-# Buscar dados do banco Supabase (Correção de aspas)
+# Buscar dados do banco Supabase
 acoes = []
 try:
     supabase = get_supabase_client()
-    # Usando aspas duplas no nome da tabela para o Supabase não converter para minúsculas
     resposta = supabase.table('"Acoes"').select("*").order("prazo", ascending=True).execute()
     acoes = resposta.data
 except Exception as e:
     st.error(f"Erro de conexão com o Supabase: {e}")
 
-
-# --- INDICADORES GRÁFICOS (PIZZA DEFINITIVA COM PLOTLY) ---
+# --- INDICADORES GRÁFICOS (PIZZA INTERATIVA) ---
 st.write("---")
 st.subheader("📊 Distribuição de Status (Monitoramento)")
 
-# Inicializa o dicionário com os status esperados
 status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
 
 if acoes:
     for a in acoes:
-        # Extrai o status limpando espaços extras e convertendo para minúsculo para comparar
         status_atual = str(a.get('status', 'Não Iniciado')).strip().lower()
-        
         if "andamento" in status_atual:
             status_contagem["Em Andamento"] += 1
         elif "concluido" in status_atual or "concluído" in status_atual:
@@ -153,41 +130,30 @@ if acoes:
         else:
             status_contagem["Não Iniciado"] += 1
 
-# Transforma os dados em um DataFrame para o Plotly
 df_pizza = pd.DataFrame(list(status_contagem.items()), columns=["Status", "Quantidade"])
 
-# Só desenha o gráfico se a soma de itens for maior que zero
 if df_pizza["Quantidade"].sum() > 0:
-    import plotly.express as px
-    
-    # Cria o gráfico de pizza/rosca interativo
     fig_pizza = px.pie(
         df_pizza, 
         values='Quantidade', 
         names='Status', 
-        hole=0.4, # Deixa em formato de rosca moderno
+        hole=0.4,
         color='Status',
         color_discrete_map={
-            'Não Iniciado': '#ff9999',  # Vermelho suave
-            'Em Andamento': '#66b3ff',  # Azul suave
-            'Concluído': '#99ff99'     # Verde suave
+            'Não Iniciado': '#ff9999',
+            'Em Andamento': '#66b3ff',
+            'Concluído': '#99ff99'
         }
     )
-    
-    # Ajusta o tamanho e margens do gráfico para ficar elegante na tela
     fig_pizza.update_layout(
         width=450, 
-        height=400, 
+        height=350, 
         margin=dict(l=20, r=20, t=20, b=20),
         legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5)
     )
-    
-    # Comando nativo do Streamlit para renderizar o Plotly
     st.plotly_chart(fig_pizza, use_container_width=False)
 else:
-    st.info("💡 Adicione ou altere o status de uma ação para visualizar o gráfico.")
-
-
+    st.info("💡 Insira ou altere o status de uma ação para visualizar as fatias do gráfico de pizza.")
 
 # --- LISTAGEM DOS ITENS SALVOS ---
 st.write("---")
@@ -195,7 +161,13 @@ st.subheader("📋 Ações Registradas")
 
 if acoes:
     df_tabela = pd.DataFrame(acoes)
-    df_tabela = df_tabela[["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]]
+    # Garante que as colunas existam antes de reordenar
+    colunas_necessarias = ["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]
+    for col in colunas_necessarias:
+        if col not in df_tabela.columns:
+            df_tabela[col] = ""
+            
+    df_tabela = df_tabela[colunas_necessarias]
     df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
@@ -216,11 +188,13 @@ if acoes:
         if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item"):
             try:
                 supabase = get_supabase_client()
-                supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
+                supabase.table('"Acoes"').delete().eq("id_acao", id_selecionado).execute()
                 st.success(f"Ação ID #{id_selecionado} excluída!")
                 st.rerun()
             except Exception as e:
                 st.error(f"Erro ao excluir: {e}")
+else:
+    st.info("Nenhuma ação cadastrada no sistema até o momento.")
 
 st.write("---")
 
@@ -264,7 +238,6 @@ quando_detalhe = str(st.text_input("Quando (Detalhe)", value=valores_padrao["qua
 lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
 status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]))
 
-# Campo de Upload de Arquivos
 arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
 
 if st.button("💾 Salvar Dados", use_container_width=True):
@@ -273,16 +246,6 @@ if st.button("💾 Salvar Dados", use_container_width=True):
     else:
         url_doc = valores_padrao["url_arquivo"]
         if arquivo_enviado:
-            st.info("Efetuando upload do arquivo...")
             url_doc = fazer_upload_storage(arquivo_enviado)
             
         sucesso, msg = salvar_acao_no_banco(
-            id_acao, descricao, porque, onde, responsavel_id_input, 
-            str(prazo), como, quando_detalhe, status_selecionado, url_doc
-        )
-        if sucesso:
-            st.success(msg)
-            st.session_state['edit_item'] = None
-            st.rerun()
-        else:
-            st.error(msg)
