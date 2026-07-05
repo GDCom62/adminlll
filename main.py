@@ -114,44 +114,50 @@ try:
 except Exception as e:
     st.error(f"Erro de conexão com o Supabase: {e}")
 
-# --- INDICADORES GRÁFICOS (PIZZA INTERATIVA) ---
+# --- INDICADORES GRÁFICOS (PIZZA DINÂMICA CORRIGIDA) ---
 st.write("---")
 st.subheader("📊 Distribuição de Status (Monitoramento)")
 
-status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
-
 if acoes:
+    # Cria uma lista limpa contendo apenas os status de todas as ações
+    lista_status_banco = []
     for a in acoes:
-        status_atual = str(a.get('status', 'Não Iniciado')).strip().lower()
-        if "andamento" in status_atual:
-            status_contagem["Em Andamento"] += 1
-        elif "concluido" in status_atual or "concluído" in status_atual:
-            status_contagem["Concluído"] += 1
+        status_texto = a.get('status')
+        if status_texto:
+            # Remove espaços extras e padroniza a primeira letra em maiúscula
+            lista_status_banco.append(str(status_texto).strip().title())
         else:
-            status_contagem["Não Iniciado"] += 1
+            lista_status_banco.append("Não Iniciado")
 
-df_pizza = pd.DataFrame(list(status_contagem.items()), columns=["Status", "Quantidade"])
+    # Conta automaticamente quantos registros existem para cada status real do banco
+    df_pizza = pd.DataFrame(lista_status_banco, columns=["Status"]).value_counts().reset_index()
+    df_pizza.columns = ["Status", "Quantidade"]
 
-if df_pizza["Quantidade"].sum() > 0:
-    fig_pizza = px.pie(
-        df_pizza, 
-        values='Quantidade', 
-        names='Status', 
-        hole=0.4,
-        color='Status',
-        color_discrete_map={
-            'Não Iniciado': '#ff9999',
-            'Em Andamento': '#66b3ff',
-            'Concluído': '#99ff99'
-        }
-    )
-    fig_pizza.update_layout(
-        width=450, 
-        height=350, 
-        margin=dict(l=20, r=20, t=20, b=20),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5)
-    )
-    st.plotly_chart(fig_pizza, use_container_width=False)
+    # Se a soma das quantidades for maior que zero, renderiza o gráfico
+    if df_pizza["Quantidade"].sum() > 0:
+        fig_pizza = px.pie(
+            df_pizza, 
+            values='Quantidade', 
+            names='Status', 
+            hole=0.4,
+            color='Status',
+            # Mapeamento dinâmico inteligente para manter as cores corretas
+            color_discrete_map={
+                'Não Iniciado': '#ff9999',
+                'Em Andamento': '#66b3ff',
+                'Concluído': '#99ff99',
+                'Concluido': '#99ff99'
+            }
+        )
+        fig_pizza.update_layout(
+            width=450, 
+            height=350, 
+            margin=dict(l=20, r=20, t=20, b=20),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5)
+        )
+        st.plotly_chart(fig_pizza, use_container_width=False)
+    else:
+        st.info("💡 Nenhuma quantidade válida encontrada para gerar as fatias do gráfico.")
 else:
     st.info("💡 Insira ou altere o status de uma ação para visualizar as fatias do gráfico de pizza.")
 
