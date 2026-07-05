@@ -96,18 +96,17 @@ with col_tit:
 with col_log:
     st.write("<br>", unsafe_allow_html=True)
     if st.button("Sair (Logout)", use_container_width=True, key="btn_logout"):
+        # Limpa o estado de login
         st.session_state['logado'] = False
         st.session_state['edit_item'] = None
+        
+        # Correção definitiva: Limpa as memórias salvas nos inputs de texto do login
+        if "login_user" in st.session_state:
+            del st.session_state["login_user"]
+        if "login_pass" in st.session_state:
+            del st.session_state["login_pass"]
+            
         st.rerun()
-
-# Buscar dados do banco Supabase de forma protegida
-acoes = []
-try:
-    supabase = get_supabase_client()
-    resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
-    acoes = resposta.data
-except Exception as e:
-    st.error(f"Erro ao carregar dados do Supabase. O banco pode estar fora do ar ou configurado incorretamente: {e}")
 
 # --- INDICADORES GRÁFICOS (PIZZA DINÂMICA) ---
 st.write("---")
