@@ -1,3 +1,4 @@
-pymysql
+supabase
 pandas
-plotly
+matplotlib
+reportlab
