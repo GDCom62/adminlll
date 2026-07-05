@@ -119,7 +119,7 @@ except Exception as e:
     st.error(f"Erro de conexão com o Supabase: {e}")
 
 
-# --- INDICADORES GRÁFICOS (PIZZA MATPLOTLIB) ---
+# --- INDICADORES GRÁFICOS (PIZZA DEFINITIVA COM PLOTLY) ---
 st.write("---")
 st.subheader("📊 Distribuição de Status (Monitoramento)")
 
@@ -138,31 +138,40 @@ if acoes:
         else:
             status_contagem["Não Iniciado"] += 1
 
-# Prepara os dados para o gráfico do Matplotlib
-labels = list(status_contagem.keys())
-valores = list(status_contagem.values())
-cores = ['#ff9999', '#66b3ff', '#99ff99'] # Vermelho, Azul, Verde
+# Transforma os dados em um DataFrame para o Plotly
+df_pizza = pd.DataFrame(list(status_contagem.items()), columns=["Status", "Quantidade"])
 
-# Exibe o gráfico se houver pelo menos 1 ação registrada no sistema
-if sum(valores) > 0:
-    fig, ax = plt.subplots(figsize=(5, 5))
+# Só desenha o gráfico se a soma de itens for maior que zero
+if df_pizza["Quantidade"].sum() > 0:
+    import plotly.express as px
     
-    # Desenha o gráfico de pizza
-    ax.pie(
-        valores, 
-        labels=labels, 
-        autopct='%1.1f%%', 
-        startangle=90, 
-        colors=cores, 
-        textprops={'fontsize': 10}
+    # Cria o gráfico de pizza/rosca interativo
+    fig_pizza = px.pie(
+        df_pizza, 
+        values='Quantidade', 
+        names='Status', 
+        hole=0.4, # Deixa em formato de rosca moderno
+        color='Status',
+        color_discrete_map={
+            'Não Iniciado': '#ff9999',  # Vermelho suave
+            'Em Andamento': '#66b3ff',  # Azul suave
+            'Concluído': '#99ff99'     # Verde suave
+        }
     )
-    ax.axis('equal') # Garante que a pizza saia perfeitamente redonda
     
-    # Renderiza o gráfico do matplotlib de forma limpa no Streamlit
-    st.pyplot(fig)
+    # Ajusta o tamanho e margens do gráfico para ficar elegante na tela
+    fig_pizza.update_layout(
+        width=450, 
+        height=400, 
+        margin=dict(l=20, r=20, t=20, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5)
+    )
+    
+    # Comando nativo do Streamlit para renderizar o Plotly
+    st.plotly_chart(fig_pizza, use_container_width=False)
 else:
-    # Caso a tabela esteja vazia, mostra uma dica visual para o usuário
-    st.info("💡 O gráfico de pizza será exibido assim que você cadastrar a primeira ação no painel abaixo.")
+    st.info("💡 Adicione ou altere o status de uma ação para visualizar o gráfico.")
+
 
 
 # --- LISTAGEM DOS ITENS SALVOS ---
