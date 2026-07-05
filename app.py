@@ -117,7 +117,7 @@ try:
 except Exception as e:
     st.error(f"Erro de conexão com o Supabase: {e}")
 
-# --- INDICADORES GRÁFICOS (PIZZA) ---
+# --- INDICADORES GRÁFICOS (PIZZA NATIVA) ---
 st.write("---")
 st.subheader("📊 Distribuição de Status (Monitoramento)")
 
@@ -128,17 +128,22 @@ if acoes:
         if status_atual in status_contagem:
             status_contagem[status_atual] += 1
 
-    # Criação do gráfico em pizza com Matplotlib
-    labels = list(status_contagem.keys())
-    valores = list(status_contagem.values())
-    cores = ['#ff9999','#66b3ff','#99ff99'] # Vermelho claro, Azul, Verde claro
+    df_pizza = pd.DataFrame(list(status_contagem.items()), columns=["Status", "Quantidade"])
     
-    fig, ax = plt.subplots(figsize=(4, 4))
-    # Só gera a pizza se houver algum dado inserido para evitar divisões por zero
-    if sum(valores) > 0:
-        ax.pie(valores, labels=labels, autopct='%1.1f%%', startangle=90, colors=cores, textprops={'fontsize': 10})
-        ax.axis('equal')  
-        st.pyplot(fig)
+    # Gera a pizza de forma nativa e limpa se houver dados
+    if df_pizza["Quantidade"].sum() > 0:
+        import altair as alt
+        
+        grafico_pizza = alt.Chart(df_pizza).mark_arc(innerRadius=0).encode(
+            theta=alt.Theta(field="Quantidade", type="quantitative"),
+            color=alt.Color(field="Status", type="nominal", scale=alt.Scale(
+                domain=['Não Iniciado', 'Em Andamento', 'Concluído'],
+                range=['#ff9999', '#66b3ff', '#99ff99']
+            )),
+            tooltip=['Status', 'Quantidade']
+        ).properties(width=400, height=400)
+        
+        st.altair_chart(grafico_pizza, use_container_width=True)
     else:
         st.info("Adicione ações para visualizar o gráfico em pizza.")
 
