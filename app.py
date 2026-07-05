@@ -9,6 +9,21 @@ from supabase import create_client, Client
 # Configuração da página Streamlit
 st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 
+# --- TESTE FORÇADO DE GRÁFICO (COLE LOGO ABAIXO DO ST.TITLE) ---
+import plotly.express as px
+import pandas as pd
+
+st.write("🔄 Executando teste forçado do gráfico...")
+dados_teste = pd.DataFrame({
+    "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
+    "Quantidade": [2, 5, 3]
+})
+
+fig_teste = px.pie(dados_teste, values="Quantidade", names="Status", hole=0.4)
+st.plotly_chart(fig_teste)
+st.write("✅ Linha após o gráfico de teste")
+# --------------------------------------------------------------
+
 # CONEXÃO DIRETA COM O SUPABASE
 SUPABASE_URL = "https://supabase.co"
 SUPABASE_KEY = "sua-chave-anonima-longa-aqui"
