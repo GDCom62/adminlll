@@ -97,7 +97,7 @@ if not st.session_state['logado']:
 # --- PAINEL PRINCIPAL ---
 col_tit, col_log = st.columns(2)
 with col_tit:
-    st.title("Plano de Ação Lavo e Levo")
+    st.title("Plano de Ação-Administrativo")
 with col_log:
     st.write("<br>", unsafe_allow_html=True)
     if st.button("Sair (Logout)", use_container_width=True, key="btn_logout_final"):
