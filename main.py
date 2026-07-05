@@ -234,6 +234,21 @@ lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
 status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0)
 
 arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
-
 if st.button("💾 Salvar Dados", use_container_width=True):
     if not descricao:
+        st.error("O campo 'Descrição (O que)' é obrigatório.")
+    else:
+        url_doc = valores_padrao["url_arquivo"]
+        if arquivo_enviado:
+            url_doc = fazer_upload_storage(arquivo_enviado)
+            
+        sucesso, msg = salvar_acao_no_banco(
+            id_acao, descricao, porque, onde, responsavel_id_input, 
+            str(prazo), como, quando_detalhe, status_selecionado, url_doc
+        )
+        if sucesso:
+            st.success(msg)
+            st.session_state['edit_item'] = None
+            st.rerun()
+        else:
+            st.error(msg)
