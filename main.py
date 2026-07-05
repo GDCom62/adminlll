@@ -7,7 +7,7 @@ import plotly.express as px  # Biblioteca nativa e estável para o gráfico
 from supabase import create_client, Client
 
 # Configuração da página Streamlit (DEVE SER A PRIMEIRA LINHA DE CÓDIGO)
-st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
+st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
 # Lembre-se de preencher com a URL e KEY corretas do seu projeto
