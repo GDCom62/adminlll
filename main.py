@@ -3,19 +3,24 @@ import pandas as pd
 import base64
 import os
 import io
-import plotly.express as px  # Biblioteca estável para o gráfico
+import plotly.express as px
 from supabase import create_client, Client
 
-# Configuração da página Streamlit
+# Configuração da página Streamlit (DEVE SER A PRIMEIRA LINHA DE CÓDIGO)
 st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Cole aqui os dados exatos retirados de Settings > API do seu painel do Supabase
 SUPABASE_URL = "https://supabase.co" 
 SUPABASE_KEY = "sua-chave-anonima-longa-real-aqui"
 
 def get_supabase_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Inicializa os estados da sessão de forma segura no topo
+if 'logado' not in st.session_state:
+    st.session_state['logado'] = False
+if 'edit_item' not in st.session_state:
+    st.session_state['edit_item'] = None
 
 # Função para fazer upload de arquivos no Storage
 def fazer_upload_storage(arquivo_upload):
@@ -48,7 +53,6 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
             "url_arquivo": url_arq
         }
         
-        # Corrigido: Removidas as aspas extras do nome da tabela "Acoes"
         if id_limpo and id_limpo.isdigit():
             supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
         else:
@@ -58,13 +62,7 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
     except Exception as e:
         return False, f"Erro ao salvar no Supabase: {str(e)}"
 
-# Inicializa os estados da sessão
-if 'logado' not in st.session_state:
-    st.session_state['logado'] = False
-if 'edit_item' not in st.session_state:
-    st.session_state['edit_item'] = None
-
-# --- TELA DE LOGIN FIXO REATIVADA ---
+# --- TELA DE LOGIN FIXO CORRIGIDA ---
 if not st.session_state['logado']:
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
@@ -80,13 +78,16 @@ if not st.session_state['logado']:
         senha = st.text_input("Senha", type="password", key="login_pass")
         
         if st.button("Entrar", use_container_width=True, key="btn_entrar"):
-            # Login rápido e seguro localmente
             if usuario == "admin" and senha == "123":
                 st.session_state['logado'] = True
-                st.rerun()
+                st.rerun()  # Força o Streamlit a redesenhar a tela já logado
             else:
                 st.error("Usuário ou senha incorretos.")
-    st.stop()
+    st.stop()  # Impede completamente a execução do resto do código se não estiver logado
+
+# ==============================================================================
+# SÓ EXECUTA DAQUI PARA BAIXO SE ESTIVER LOGADO DE FATO
+# ==============================================================================
 
 # --- PAINEL PRINCIPAL ---
 col_tit, col_log = st.columns(2)
@@ -99,15 +100,14 @@ with col_log:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# Buscar dados do banco Supabase
+# Buscar dados do banco Supabase de forma protegida
 acoes = []
 try:
     supabase = get_supabase_client()
-    # Corrigido: tabela sem aspas extras e uso de desc=False para as novas versões do Supabase
     resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
     acoes = resposta.data
 except Exception as e:
-    st.error(f"Erro de conexão com o Supabase: {e}")
+    st.error(f"Erro ao carregar dados do Supabase. O banco pode estar fora do ar ou configurado incorretamente: {e}")
 
 # --- INDICADORES GRÁFICOS (PIZZA DINÂMICA) ---
 st.write("---")
@@ -235,12 +235,5 @@ status_selecionado = st.selectbox("Status", lista_status, index=lista_status.ind
 
 arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
 
-# Botão Salvar Dados com Indentação Corrigida de Fábrica
 if st.button("💾 Salvar Dados", use_container_width=True):
     if not descricao:
-        st.error("O campo 'Descrição (O que)' é obrigatório.")
-    else:
-        url_doc = valores_padrao["url_arquivo"]
-        if arquivo_enviado:
-            url_doc = fazer_upload_storage(arquivo_enviado)
-            
