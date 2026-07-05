@@ -98,16 +98,9 @@ with col_tit:
 with col_log:
     st.write("<br>", unsafe_allow_html=True)
     if st.button("Sair (Logout)", use_container_width=True, key="btn_logout"):
-        # Limpa o estado de login
+        # Reseta os estados de forma direta e limpa
         st.session_state['logado'] = False
         st.session_state['edit_item'] = None
-        
-        # Correção definitiva: Limpa as memórias salvas nos inputs de texto do login
-        if "login_user" in st.session_state:
-            del st.session_state["login_user"]
-        if "login_pass" in st.session_state:
-            del st.session_state["login_pass"]
-            
         st.rerun()
 
 # --- INDICADORES GRÁFICOS (PIZZA DINÂMICA) ---
