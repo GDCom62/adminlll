@@ -62,7 +62,7 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
     except Exception as e:
         return False, f"Erro ao salvar no Supabase: {str(e)}"
 
-# --- TELA DE LOGIN FIXO CORRIGIDA DEFINITIVO ---
+# --- TELA DE LOGIN ANTI-FANTASMA ---
 if not st.session_state['logado']:
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
@@ -75,17 +75,23 @@ if not st.session_state['logado']:
     with col_b2:
         st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
         
-        # Mudamos as chaves (keys) dinamicamente para forçar o reset ao deslogar
-        usuario = st.text_input("Usuário", key=f"user_{st.session_state['logado']}")
-        senha = st.text_input("Senha", type="password", key=f"pass_{st.session_state['logado']}")
+        # Criamos chaves estáticas novas para desvincular de qualquer bug passado
+        usuario_input = st.text_input("Usuário", key="txt_usuario_novo")
+        senha_input = st.text_input("Senha", type="password", key="txt_senha_novo")
         
-        if st.button("Entrar", use_container_width=True, key="btn_entrar"):
-            if usuario == "admin" and senha == "123":
+        if st.button("Entrar", use_container_width=True, key="btn_entrar_novo"):
+            # Tratamento de segurança: remove espaços em branco antes e depois do texto
+            user_limpo = usuario_input.strip().lower()
+            senha_limpa = senha_input.strip()
+            
+            # Validação direta e infalível
+            if user_limpo == "admin" and senha_limpa == "123":
                 st.session_state['logado'] = True
                 st.rerun()
             else:
                 st.error("Usuário ou senha incorretos.")
     st.stop()
+
 
 # ==============================================================================
 # SÓ EXECUTA DAQUI PARA BAIXO SE ESTIVER LOGADO DE FATO
