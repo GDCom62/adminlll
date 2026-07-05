@@ -3,14 +3,14 @@ import pandas as pd
 import base64
 import os
 import io
-import plotly.express as px  # Biblioteca nativa e super estável para o gráfico
+import plotly.express as px  # Biblioteca nativa e estável para o gráfico
 from supabase import create_client, Client
 
 # Configuração da página Streamlit
 st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Coloque aqui as suas credenciais reais do Supabase
+# Substitua com as suas credenciais reais do Supabase
 SUPABASE_URL = "https://supabase.co"
 SUPABASE_KEY = "sua-chave-anonima-longa-aqui"
 
@@ -114,26 +114,22 @@ try:
 except Exception as e:
     st.error(f"Erro de conexão com o Supabase: {e}")
 
-# --- INDICADORES GRÁFICOS (PIZZA DINÂMICA CORRIGIDA) ---
+# --- INDICADORES GRÁFICOS (PIZZA DINÂMICA) ---
 st.write("---")
 st.subheader("📊 Distribuição de Status (Monitoramento)")
 
 if acoes:
-    # Cria uma lista limpa contendo apenas os status de todas as ações
     lista_status_banco = []
     for a in acoes:
         status_texto = a.get('status')
         if status_texto:
-            # Remove espaços extras e padroniza a primeira letra em maiúscula
             lista_status_banco.append(str(status_texto).strip().title())
         else:
             lista_status_banco.append("Não Iniciado")
 
-    # Conta automaticamente quantos registros existem para cada status real do banco
     df_pizza = pd.DataFrame(lista_status_banco, columns=["Status"]).value_counts().reset_index()
     df_pizza.columns = ["Status", "Quantidade"]
 
-    # Se a soma das quantidades for maior que zero, renderiza o gráfico
     if df_pizza["Quantidade"].sum() > 0:
         fig_pizza = px.pie(
             df_pizza, 
@@ -141,7 +137,6 @@ if acoes:
             names='Status', 
             hole=0.4,
             color='Status',
-            # Mapeamento dinâmico inteligente para manter as cores corretas
             color_discrete_map={
                 'Não Iniciado': '#ff9999',
                 'Em Andamento': '#66b3ff',
@@ -167,7 +162,6 @@ st.subheader("📋 Ações Registradas")
 
 if acoes:
     df_tabela = pd.DataFrame(acoes)
-    # Garante que as colunas existam antes de reordenar
     colunas_necessarias = ["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]
     for col in colunas_necessarias:
         if col not in df_tabela.columns:
@@ -242,7 +236,7 @@ como = st.text_input("Como", value=valores_padrao["como"])
 quando_detalhe = str(st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"]))
 
 lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
-status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]))
+status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0)
 
 arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
 
@@ -252,6 +246,3 @@ if st.button("💾 Salvar Dados", use_container_width=True):
     else:
         url_doc = valores_padrao["url_arquivo"]
         if arquivo_enviado:
-            url_doc = fazer_upload_storage(arquivo_enviado)
-            
-        sucesso, msg = salvar_acao_no_banco(
