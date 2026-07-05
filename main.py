@@ -10,9 +10,10 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Substitua com as suas credenciais reais do Supabase
-SUPABASE_URL = "https://supabase.co"
-SUPABASE_KEY = "sua-chave-anonima-longa-aqui"
+# Cole aqui os dados exatos retirados de Settings > API do seu painel
+SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" # Substitua pela sua URL real
+SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"         
+# Substitua pela sua chave anon-public real
 
 def get_supabase_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
