@@ -1,9 +1,9 @@
 import streamlit as st
-import mysql.connector
 import pandas as pd
 import base64
 import os
 import io
+from supabase import create_client, Client  # Substituído mysql.connector por Supabase
 
 # Bibliotecas para geração de PDF
 from reportlab.lib.pagesizes import landscape, A4
@@ -18,42 +18,43 @@ st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 USUARIO_FIXO = "admin"
 SENHA_FIXA = "123"
 
-# CONEXÃO DIRETA COM A CLEVER CLOUD
-def get_db_connection():
-    v_host = str("://clever-cloud.com").strip()
-    return mysql.connector.connect(
-        host=v_host,
-        user="uaoxaabon9ifpx5x",
-        password="vDf6RJjOb2Bt16XX3YOg",
-        database="b7dxmekynipigcv1sftu",
-        port=3306
-    )
+# CONEXÃO DIRETA COM O SUPABASE
+# Substitua com as suas credenciais reais do painel do Supabase (Project Settings > API)
+SUPABASE_URL = "https://supabase.co"
+SUPABASE_KEY = "sua-chave-anonima-longa-aqui"
+
+def get_supabase_client() -> Client:
+    """Inicializa e retorna o cliente do Supabase."""
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Função isolada para salvar ou atualizar dados no Banco de Dados
 def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status):
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        supabase = get_supabase_client()
+        
+        # Cria o dicionário com os dados no formato que o Supabase/PostgreSQL espera
+        dados_acao = {
+            "descricao_acao": descricao,
+            "porque": v_porque,
+            "onde": v_onde,
+            "id_responsavel": id_resp_final,
+            "prazo": prazo_str,
+            "como": v_como,
+            "quando_detalhe": v_quando,
+            "status": status
+        }
         
         if id_limpo and id_limpo.isdigit():
-            # Query de Edição (UPDATE)
-            query = "UPDATE Acoes SET descricao_acao=%s, porque=%s, onde=%s, id_responsavel=%s, prazo=%s, como=%s, quando_detalhe=%s, status=%s WHERE id_acao=%s"
-            valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, int(id_limpo))
-            cursor.execute(query, valores)
+            # Query de Edição (UPDATE) no Supabase
+            # Filtra pelo ID da ação e atualiza os dados
+            resposta = supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
         else:
-            # Query de Criação (INSERT)
-            query = "INSERT INTO Acoes (descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-            valores = (descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status)
-            cursor.execute(query, valores)
+            # Query de Criação (INSERT) no Supabase
+            resposta = supabase.table("Acoes").insert(dados_acao).execute()
             
-        conn.commit()
-        cursor.close()
-        conn.close()
         return True, "Operação realizada com sucesso!"
-    except mysql.connector.Error as err:
-        return False, f"Erro MySQL {err.errno}: {err.msg}"
     except Exception as e:
-        return False, str(e)
+        return False, f"Erro ao salvar no Supabase: {str(e)}"
 
 # Função para gerar PDF
 def gerar_pdf(acoes):
@@ -72,7 +73,7 @@ def gerar_pdf(acoes):
             str(a['como']), str(a['quando_detalhe'])
         ])
 
-    # CORREÇÃO: Larguras reais em pontos definidas explicitamente
+    # Larguras reais em pontos definidas explicitamente
     t = Table(data, colWidths=[40, 160, 70, 80, 120, 100, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -113,6 +114,7 @@ if not st.session_state['logado']:
             else:
                 st.error("Usuário ou senha incorretos.")
     st.stop()
+
 
 # --- PAINEL PRINCIPAL ---
 col_tit, col_log = st.columns(2)
