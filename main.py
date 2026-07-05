@@ -1,227 +1,288 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import json
+import base64
 import os
-from datetime import datetime, date
 import io
+import matplotlib.pyplot as plt # Nova biblioteca para o gráfico de pizza
+from supabase import create_client, Client
 
-# 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(page_title="Lavo e Levo - Plano Estratégico", layout="wide")
+# Configuração da página Streamlit
+st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 
-# Estilização em CSS para fixar o logo1.png no rodapé direito inferior da tela
-st.markdown("""
-    <style>
-    .footer-logo {
-        position: fixed;
-        bottom: 15px;
-        right: 15px;
-        width: 120px;
-        z-index: 9999;
-        opacity: 0.85;
-        transition: opacity 0.3s;
-    }
-    .footer-logo:hover {
-        opacity: 1;
-    }
-    </style>
-    <img src="app/static/logo1.png" class="footer-logo" onerror="this.style.display='none'">
-""", unsafe_allow_html=True)
+# --- TESTE FORÇADO DE GRÁFICO (COLE LOGO ABAIXO DO ST.TITLE) ---
+import plotly.express as px
+import pandas as pd
 
-# 2. SISTEMA DE ARQUIVO TEXTO SEGURO (Substitui o SQLite instável da nuvem)
-ARQUIVO_BANCO = "plano_de_acao_seguro.json"
+st.write("🔄 Executando teste forçado do gráfico...")
+dados_teste = pd.DataFrame({
+    "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
+    "Quantidade": [2, 5, 3]
+})
 
-def carregar_dados_json():
-    # Se o arquivo não existir, cria um lote padrão inicial estável
-    if not os.path.exists(ARQUIVO_BANCO):
-        dados_iniciais = [{
-            "id_acao": 1,
-            "descricao_acao": "Exemplo de Plano Estratégico Inicial",
-            "porque": "Organizar as metas da lavanderia",
-            "como": "Preenchendo o formulário 5W2H",
-            "quem": "Equipe Lavo e Levo",
-            "prazo": str(date.today()),
-            "quanto_custa": 0.0,
-            "status": "Em andamento",
-            "prioridade": "Média",
-            "observacoes": "Sistema operando em modo de persistência contínua por texto seguro."
-        }]
-        salvar_dados_json(dados_iniciais)
-        return dados_iniciais
+fig_teste = px.pie(dados_teste, values="Quantidade", names="Status", hole=0.4)
+st.plotly_chart(fig_teste)
+st.write("✅ Linha após o gráfico de teste")
+# --------------------------------------------------------------
+
+# CONEXÃO DIRETA COM O SUPABASE
+SUPABASE_URL = "https://supabase.co"
+SUPABASE_KEY = "sua-chave-anonima-longa-aqui"
+
+def get_supabase_client() -> Client:
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Função para fazer upload de arquivos no Storage
+def fazer_upload_storage(arquivo_upload):
+    if arquivo_upload is not None:
+        try:
+            supabase = get_supabase_client()
+            bytes_data = arquivo_upload.getvalue()
+            # Nome único para o arquivo
+            nome_arquivo = f"{pd.Timestamp.now().strftime('%Y%m%d%H%M%S')}_{arquivo_upload.name}"
+            
+            # Upload para o bucket 'arquivos_acoes'
+            supabase.storage.from_("arquivos_acoes").upload(nome_arquivo, bytes_data)
+            
+            # Pega a URL pública do arquivo
+            url_publica = supabase.storage.from_("arquivos_acoes").get_public_url(nome_arquivo)
+            return url_publica
+        except Exception as e:
+            st.error(f"Erro ao subir arquivo: {e}")
+            return None
+    return None
+
+# Função para salvar ou atualizar dados no Banco de Dados
+def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, url_arq):
     try:
-        with open(ARQUIVO_BANCO, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
-
-def salvar_dados_json(dados):
-    try:
-        with open(ARQUIVO_BANCO, "w", encoding="utf-8") as f:
-            json.dump(dados, f, ensure_ascii=False, indent=4)
-        return True
+        supabase = get_supabase_client()
+        
+        dados_acao = {
+            "descricao_acao": descricao,
+            "porque": v_porque,
+            "onde": v_onde,
+            "id_responsavel": id_resp_final,
+            "prazo": prazo_str,
+            "como": v_como,
+            "quando_detalhe": v_quando,
+            "status": status,
+            "url_arquivo": url_arq
+        }
+        
+        if id_limpo and id_limpo.isdigit():
+            resposta = supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
+        else:
+            resposta = supabase.table("Acoes").insert(dados_acao).execute()
+            
+        return True, "Operação realizada com sucesso!"
     except Exception as e:
-        st.error(f"Erro físico de gravação: {e}")
-        return False
+        return False, f"Erro ao salvar no Supabase: {str(e)}"
 
-# Inicializa o banco de dados em texto estável
-banco_dados_texto = carregar_dados_json()
+# Inicializa o estado de login e edição
+if 'logado' not in st.session_state:
+    st.session_state['logado'] = False
+if 'edit_item' not in st.session_state:
+    st.session_state['edit_item'] = None
 
-# 3. CONTROLE DE SESSÃO
-if 'logado' not in st.session_state: st.session_state['logado'] = False
-if 'edit_id' not in st.session_state: st.session_state.edit_id = None
-
-# --- TELA DE LOGIN ---
+# --- TELA DE LOGIN REAL COM SUPABASE ---
 if not st.session_state['logado']:
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
         try:
             st.image("logo.png", use_container_width=True)
         except Exception:
-            st.markdown("<h2 style='text-align: center;'>🧺 Lavanderia Lavo e Levo</h2>", unsafe_allow_html=True)
+            st.caption("📷 *[Insira o arquivo logo.png no seu GitHub]*")
+    
+    col_b1, col_b2, col_b3 = st.columns(3)
+    with col_b2:
+        st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
+        email = st.text_input("E-mail cadastrado", key="login_email")
+        senha = st.text_input("Senha", type="password", key="login_pass")
         
-        with st.form("login_form"):
-            st.markdown("<h3 style='text-align: center; color: #1E3A8A;'>Acesso ao Sistema</h3>", unsafe_allow_html=True)
-            u = st.text_input("Usuário")
-            s = st.text_input("Senha", type="password")
-            if st.form_submit_button("Entrar no Sistema", use_container_width=True):
-                if u == "admin" and s == "123":
+        if st.button("Entrar", use_container_width=True, key="btn_entrar"):
+            try:
+                supabase = get_supabase_client()
+                # Autenticação real na API do Supabase
+                auth_res = supabase.auth.sign_in_with_password({"email": email, "password": senha})
+                if auth_res.user:
                     st.session_state['logado'] = True
                     st.rerun()
-                else:
-                    st.error("Dados de acesso incorretos. Use admin e 123.")
+            except Exception:
+                st.error("E-mail ou senha incorretos no Supabase.")
     st.stop()
 
-# --- PREPARAÇÃO DAS TABELAS VISUAIS ---
-df = pd.DataFrame(banco_dados_texto)
-hoje = date.today()
+# --- PAINEL PRINCIPAL ---
+col_tit, col_log = st.columns(2)
+with col_tit:
+    st.title("Plano de Ação Lavo e Levo")
+with col_log:
+    st.write("<br>", unsafe_allow_html=True)
+    if st.button("Sair (Logout)", use_container_width=True, key="btn_logout"):
+        supabase = get_supabase_client()
+        supabase.auth.sign_out() # Desconecta da sessão real
+        st.session_state['logado'] = False
+        st.session_state['edit_item'] = None
+        st.rerun()
 
-# --- TITULO PERSONALIZADO ---
-st.markdown("""
-    <h1 style='text-align: center; color: #1E3A8A; padding-bottom: 5px;'>
-        🧺 PLANO DE AÇAO - Administrativo
-    </h1>
-    <p style='text-align: center; color: #6B7280; font-size: 1.1em;'>Gestão 5W2H e Controle de Performance</p>
-    <hr style='border: 1px solid #3B82F6; margin-bottom: 30px;'>
-""", unsafe_allow_html=True)
+# Buscar dados do banco Supabase (Correção de aspas)
+acoes = []
+try:
+    supabase = get_supabase_client()
+    # Usando aspas duplas no nome da tabela para o Supabase não converter para minúsculas
+    resposta = supabase.table('"Acoes"').select("*").order("prazo", ascending=True).execute()
+    acoes = resposta.data
+except Exception as e:
+    st.error(f"Erro de conexão com o Supabase: {e}")
 
-tab_lista, tab_graficos = st.tabs(["📝 Lançamentos e Controle", "📊 Análise de Performance"])
 
-# ==============================================================================
-# 📝 CONTEÚDO DA ABA 1: LANÇAMENTOS E CONTROLE
-# ==============================================================================
-if tab_lista.button("➕ Nova Ação (Limpar Formulário)", use_container_width=True):
-    st.session_state.edit_id = None
-    st.rerun()
+# --- INDICADORES GRÁFICOS (PIZZA DEFINITIVA COM PLOTLY) ---
+st.write("---")
+st.subheader("📊 Distribuição de Status (Monitoramento)")
 
-dados_edit = None
-if st.session_state.edit_id:
-    for acao in banco_dados_texto:
-        if acao['id_acao'] == st.session_state.edit_id:
-            dados_edit = acao
+# Inicializa o dicionário com os status esperados
+status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
 
-titulo_formulario = f"📝 Editando Ação #{st.session_state.edit_id}" if st.session_state.edit_id else "📝 Formulário 5W2H"
-form_expander = tab_lista.expander(titulo_formulario, expanded=(st.session_state.edit_id is not None))
-
-with form_expander.form("form_5w2h", clear_on_submit=True):
-    c1, c2 = st.columns(2)
-    with c1:
-        what = st.text_input("What (O que?) *", value=dados_edit['descricao_acao'] if dados_edit else "")
-        why = st.text_area("Why (Por que?)", value=dados_edit['porque'] if dados_edit else "")
-        how = st.text_area("How (Como?)", value=dados_edit['como'] if dados_edit else "")
-        prio = st.select_slider("Prioridade", options=["Baixa", "Média", "Alta"], value=dados_edit['prioridade'] if dados_edit else "Média")
-    with c2:
-        lista_usuarios = ["Equipe Lavo e Levo", "Gerência", "Administrativo"]
-        index_u = lista_usuarios.index(dados_edit['quem']) if dados_edit and dados_edit['quem'] in lista_usuarios else 0
-        who = st.selectbox("Who (Quem?)", lista_usuarios, index=index_u)
+if acoes:
+    for a in acoes:
+        # Extrai o status limpando espaços extras e convertendo para minúsculo para comparar
+        status_atual = str(a.get('status', 'Não Iniciado')).strip().lower()
         
-        prazo_inicial = date.today()
-        if dados_edit and dados_edit['prazo']:
-            try:
-                prazo_inicial = datetime.strptime(dados_edit['prazo'], '%Y-%m-%d').date()
-            except:
-                prazo_inicial = date.today()
-                
-        when = st.date_input("When (Prazo)", prazo_inicial, format="DD/MM/YYYY")
-        cost = st.number_input("How Much (Custo R$)", value=float(dados_edit['quanto_custa'] or 0) if dados_edit else 0.0)
-        
-        status_opcoes = ["Em análise", "Em andamento", "Concluído"]
-        status_index = status_opcoes.index(dados_edit['status']) if dados_edit and dados_edit['status'] in status_opcoes else 0
-        status = st.selectbox("Status", status_opcoes, index=status_index)
-        
-        obs = st.text_input("Observações", value=dados_edit['observacoes'] if dados_edit else "")
-
-    texto_botao_salvar = "💾 Gravar Alterações" if st.session_state.edit_id else "💾 Salvar Plano de Ação"
-    if st.form_submit_button(texto_botao_salvar, use_container_width=True):
-        if not what.strip():
-            st.error("O campo 'What (O que?)' é obrigatório.")
+        if "andamento" in status_atual:
+            status_contagem["Em Andamento"] += 1
+        elif "concluido" in status_atual or "concluído" in status_atual:
+            status_contagem["Concluído"] += 1
         else:
-            if st.session_state.edit_id:
-                # Altera o item no banco de texto seguro
-                for acao in banco_dados_texto:
-                    if acao['id_acao'] == st.session_state.edit_id:
-                        acao.update({
-                            "descricao_acao": what, "porque": why, "como": how,
-                            "quem": who, "prazo": str(when), "quanto_custa": cost,
-                            "status": status, "prioridade": prio, "observacoes": obs
-                        })
-                salvar_dados_json(banco_dados_texto)
-                st.session_state.edit_id = None
-            else:
-                # Determina o próximo ID de forma incremental
-                novo_id = max([a['id_acao'] for a in banco_dados_texto]) + 1 if banco_dados_texto else 1
-                banco_dados_texto.append({
-                    "id_acao": novo_id,
-                    "descricao_acao": what, "porque": why, "como": how,
-                    "quem": who, "prazo": str(when), "quanto_custa": cost,
-                    "status": status, "prioridade": prio, "observacoes": obs
-                })
-                salvar_dados_json(banco_dados_texto)
-            st.rerun()
+            status_contagem["Não Iniciado"] += 1
 
-# --- PAINEL DE CONTROLE FIXO SUPERIOR ---
-tab_lista.subheader("📋 Ações e Prazos")
+# Transforma os dados em um DataFrame para o Plotly
+df_pizza = pd.DataFrame(list(status_contagem.items()), columns=["Status", "Quantidade"])
 
-if df.empty:
-    tab_lista.info("Nenhuma ação cadastrada no sistema.")
+# Só desenha o gráfico se a soma de itens for maior que zero
+if df_pizza["Quantidade"].sum() > 0:
+    import plotly.express as px
+    
+    # Cria o gráfico de pizza/rosca interativo
+    fig_pizza = px.pie(
+        df_pizza, 
+        values='Quantidade', 
+        names='Status', 
+        hole=0.4, # Deixa em formato de rosca moderno
+        color='Status',
+        color_discrete_map={
+            'Não Iniciado': '#ff9999',  # Vermelho suave
+            'Em Andamento': '#66b3ff',  # Azul suave
+            'Concluído': '#99ff99'     # Verde suave
+        }
+    )
+    
+    # Ajusta o tamanho e margens do gráfico para ficar elegante na tela
+    fig_pizza.update_layout(
+        width=450, 
+        height=400, 
+        margin=dict(l=20, r=20, t=20, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5)
+    )
+    
+    # Comando nativo do Streamlit para renderizar o Plotly
+    st.plotly_chart(fig_pizza, use_container_width=False)
 else:
-    st.markdown("### ⚙️ Painel de Manutenção de Ações")
-    c_id, c_ed, c_ex = tab_lista.columns([0.4, 0.3, 0.3])
-    
-    lista_ids = df['id_acao'].tolist()
-    id_selecionado = c_id.selectbox("Escolha o número do ID que deseja alterar ou apagar:", lista_ids)
-    
-    if c_ed.button("✏️ Editar ID Selecionado", use_container_width=True):
-        st.session_state.edit_id = id_selecionado
-        st.rerun()
-        
-    if c_ex.button("🗑️ Excluir ID Selecionado", use_container_width=True):
-        banco_dados_texto = [a for a in banco_dados_texto if a['id_acao'] != id_selecionado]
-        salvar_dados_json(banco_dados_texto)
-        st.success(f"Item #{id_selecionado} removido com sucesso!")
-        st.rerun()
-        
-    tab_lista.markdown("---")
-    
-    tab_lista.write("📊 **Lista de Controle Cadastrada:**")
-    st_df = df[["id_acao", "descricao_acao", "prioridade", "quem", "prazo", "quanto_custa", "status"]]
-    tab_lista.dataframe(st_df, use_container_width=True, hide_index=True)
-    
-    tab_lista.write("---")
+    st.info("💡 Adicione ou altere o status de uma ação para visualizar o gráfico.")
 
-    for _, row in df.iterrows():
-        try:
-            dt_br = datetime.strptime(row['prazo'], '%Y-%m-%d').strftime('%d/%m/%Y')
-            data_prazo = datetime.strptime(row['prazo'], '%Y-%m-%d').date()
-        except:
-            dt_br = str(row['prazo'])
-            data_prazo = hoje
+
+
+# --- LISTAGEM DOS ITENS SALVOS ---
+st.write("---")
+st.subheader("📋 Ações Registradas")
+
+if acoes:
+    df_tabela = pd.DataFrame(acoes)
+    df_tabela = df_tabela[["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]]
+    df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
+    st.dataframe(df_tabela, use_container_width=True, hide_index=True)
+    
+    st.write("**Ações de Gerenciamento:**")
+    col_sel, col_btn_ed, col_btn_ex = st.columns(3)
+    
+    with col_sel:
+        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_manutencao")
+    
+    with col_btn_ed:
+        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item"):
+            item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
+            if item_procurado:
+                st.session_state['edit_item'] = item_procurado
+                st.rerun()
+                
+    with col_btn_ex:
+        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item"):
+            try:
+                supabase = get_supabase_client()
+                supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
+                st.success(f"Ação ID #{id_selecionado} excluída!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao excluir: {e}")
+
+st.write("---")
+
+# --- CONFIGURAÇÃO DE VALORES PADRÃO ---
+valores_padrao = {
+    "id": "", "descricao": "", "porque": "", "onde": "", 
+    "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
+}
+
+if st.session_state['edit_item']:
+    item = st.session_state['edit_item']
+    valores_padrao = {
+        "id": str(item['id_acao']),
+        "descricao": str(item['descricao_acao']),
+        "porque": str(item['porque']) if item['porque'] else "",
+        "onde": str(item['onde']) if item['onde'] else "",
+        "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
+        "como": str(item['como']) if item['como'] else "",
+        "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
+        "status": str(item['status']),
+        "prazo": item['prazo'],
+        "url_arquivo": item.get('url_arquivo')
+    }
+    st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
+
+# --- PAINEL OPERACIONAL ---
+st.subheader("Painel: Registrar Informações")
+
+id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
+descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
+porque = st.text_input("Por que", value=valores_padrao["porque"])
+onde = st.text_input("Onde", value=valores_padrao["onde"])
+responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"])
+
+prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
+prazo = st.date_input("Prazo *", value=prazo_val)
+
+como = st.text_input("Como", value=valores_padrao["como"])
+quando_detalhe = str(st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"]))
+
+lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
+status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]))
+
+# Campo de Upload de Arquivos
+arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
+
+if st.button("💾 Salvar Dados", use_container_width=True):
+    if not descricao:
+        st.error("O campo 'Descrição (O que)' é obrigatório.")
+    else:
+        url_doc = valores_padrao["url_arquivo"]
+        if arquivo_enviado:
+            st.info("Efetuando upload do arquivo...")
+            url_doc = fazer_upload_storage(arquivo_enviado)
             
-        atraso = data_prazo < hoje and row['status'] != 'Concluído'
-        cor = "#dc3545" if atraso else "#28a745" if row['status'] == "Concluído" else "#ffc107"
-        
-        card_container = tab_lista.container()
-        card_container.markdown(f"<div style='background-color:{cor}; height:6px; width:100%; border-radius:5px; margin-bottom:8px;'></div>", unsafe_allow_html=True)
-        
-        card_container.write(f"📌 **[ID #{row['id_acao']}] - {row['descricao_acao']}** | Responsável: *{row['quem']}* | Prazo: **{dt_br}**")
-        if row['porque']: card_container.caption(f"❓ **Motivo (Why):** {row['porque']}")
-        if row['como']: card_container.caption(f"🔧 **Como fazer (How):** {row['como']}")
+        sucesso, msg = salvar_acao_no_banco(
+            id_acao, descricao, porque, onde, responsavel_id_input, 
+            str(prazo), como, quando_detalhe, status_selecionado, url_doc
+        )
+        if sucesso:
+            st.success(msg)
+            st.session_state['edit_item'] = None
+            st.rerun()
+        else:
+            st.error(msg)
