@@ -115,7 +115,6 @@ if not st.session_state['logado']:
                 st.error("Usuário ou senha incorretos.")
     st.stop()
 
-
 # --- PAINEL PRINCIPAL ---
 col_tit, col_log = st.columns(2)
 with col_tit:
@@ -127,20 +126,23 @@ with col_log:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# Buscar dados do banco
+# Buscar dados do banco Supabase
 acoes = []
 erro_banco = None
 try:
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id_acao, descricao_acao, porque, onde, id_responsavel, CAST(prazo AS CHAR) as prazo, como, quando_detalhe, status FROM Acoes ORDER BY prazo ASC")
-    acoes = cursor.fetchall()
-    conn.close()
+    supabase = get_supabase_client()
+    # Executa a busca ordenando pelo prazo de forma ascendente
+    resposta = supabase.table("Acoes").select(
+        "id_acao, descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status"
+    ).order("prazo", ascending=True).execute()
+    
+    # Atribui os dados retornados à lista de ações
+    acoes = resposta.data
 except Exception as e:
     erro_banco = str(e)
 
 if erro_banco:
-    st.error(f"Erro de conexão com a Clever Cloud: {erro_banco}")
+    st.error(f"Erro de conexão com o Supabase: {erro_banco}")
 
 # --- INDICADORES GRÁFICOS ---
 st.write("---")
@@ -172,6 +174,8 @@ st.subheader("📋 Ações Registradas")
 
 if acoes:
     df_tabela = pd.DataFrame(acoes)
+    # Garante a ordem correta das colunas conforme o DataFrame original
+    df_tabela = df_tabela[["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status"]]
     df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
@@ -191,17 +195,16 @@ if acoes:
     with col_btn_ex:
         if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item"):
             try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM Acoes WHERE id_acao = %s", (id_selecionado,))
-                conn.commit()
-                conn.close()
+                supabase = get_supabase_client()
+                # Comando DELETE filtrando pelo ID da ação selecionada
+                supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
+                
                 st.success(f"Ação ID #{id_selecionado} excluída com sucesso!")
                 if st.session_state['edit_item'] and st.session_state['edit_item']['id_acao'] == id_selecionado:
                     st.session_state['edit_item'] = None
                 st.rerun()
             except Exception as e:
-                st.error(f"Erro ao excluir: {e}")
+                st.error(f"Erro ao excluir no Supabase: {e}")
 else:
     st.info("Nenhuma ação cadastrada no sistema até o momento.")
 
@@ -241,10 +244,18 @@ porque = st.text_input("Por que", value=valores_padrao["porque"], key="input_por
 onde = st.text_input("Onde", value=valores_padrao["onde"], key="input_onde")
 responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"], key="input_resp")
 
-prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
+# Conversão da data vinda do Supabase para o formato date do Python
+try:
+    prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
+except Exception:
+    prazo_val = pd.Timestamp.now().date()
+
 prazo = st.date_input("Prazo *", value=prazo_val, key="input_prazo")
 
 como = st.text_input("Como", value=valores_padrao["como"], key="input_como")
 quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"], key="input_quando")
+
+lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
+
 
 lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
