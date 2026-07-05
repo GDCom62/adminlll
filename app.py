@@ -108,14 +108,16 @@ with col_log:
         st.session_state['edit_item'] = None
         st.rerun()
 
-# Buscar dados do banco Supabase
+# Buscar dados do banco Supabase (Correção de aspas)
 acoes = []
 try:
     supabase = get_supabase_client()
-    resposta = supabase.table("Acoes").select("*").order("prazo", ascending=True).execute()
+    # Usando aspas duplas no nome da tabela para o Supabase não converter para minúsculas
+    resposta = supabase.table('"Acoes"').select("*").order("prazo", ascending=True).execute()
     acoes = resposta.data
 except Exception as e:
     st.error(f"Erro de conexão com o Supabase: {e}")
+
 
 # --- INDICADORES GRÁFICOS (PIZZA MATPLOTLIB) ---
 st.write("---")
