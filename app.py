@@ -117,54 +117,51 @@ try:
 except Exception as e:
     st.error(f"Erro de conexão com o Supabase: {e}")
 
-# --- INDICADORES GRÁFICOS (PIZZA CORRIGIDA) ---
+# --- INDICADORES GRÁFICOS (PIZZA MATPLOTLIB) ---
 st.write("---")
 st.subheader("📊 Distribuição de Status (Monitoramento)")
 
-# Criamos um dicionário padrão com letras minúsculas para comparar sem erro
-status_contagem = {"não iniciado": 0, "em andamento": 0, "concluído": 0}
+# Inicializa o dicionário com os status esperados
+status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
 
 if acoes:
     for a in acoes:
-        # Pegamos o status, removemos espaços extras e transformamos em minúsculo
-        status_atual = str(a.get('status', 'não iniciado')).strip().lower()
+        # Extrai o status limpando espaços extras e convertendo para minúsculo para comparar
+        status_atual = str(a.get('status', 'Não Iniciado')).strip().lower()
         
-        # Correção para o caso de o texto ter variação de acentuação no banco
         if "andamento" in status_atual:
-            status_contagem["em andamento"] += 1
+            status_contagem["Em Andamento"] += 1
         elif "concluido" in status_atual or "concluído" in status_atual:
-            status_contagem["concluído"] += 1
+            status_contagem["Concluído"] += 1
         else:
-            status_contagem["não iniciado"] += 1
+            status_contagem["Não Iniciado"] += 1
 
-    # Formatamos os nomes de volta para a exibição no gráfico
-    dados_formatados = {
-        "Não Iniciado": status_contagem["não iniciado"],
-        "Em Andamento": status_contagem["em andamento"],
-        "Concluído": status_contagem["concluído"]
-    }
+# Prepara os dados para o gráfico do Matplotlib
+labels = list(status_contagem.keys())
+valores = list(status_contagem.values())
+cores = ['#ff9999', '#66b3ff', '#99ff99'] # Vermelho, Azul, Verde
 
-    df_pizza = pd.DataFrame(list(dados_formatados.items()), columns=["Status", "Quantidade"])
+# Exibe o gráfico se houver pelo menos 1 ação registrada no sistema
+if sum(valores) > 0:
+    fig, ax = plt.subplots(figsize=(5, 5))
     
-    # Se a soma for maior que zero, exibe o gráfico nativo Altair (sem risco de erro de pip)
-    if df_pizza["Quantidade"].sum() > 0:
-        import altair as alt
-        
-        grafico_pizza = alt.Chart(df_pizza).mark_arc(innerRadius=0).encode(
-            theta=alt.Theta(field="Quantidade", type="quantitative"),
-            color=alt.Color(field="Status", type="nominal", scale=alt.Scale(
-                domain=['Não Iniciado', 'Em Andamento', 'Concluído'],
-                range=['#ff9999', '#66b3ff', '#99ff99'] # Cores estéticas
-            )),
-            tooltip=['Status', 'Quantidade']
-        ).properties(width=400, height=400)
-        
-        st.altair_chart(grafico_pizza, use_container_width=True)
-    else:
-        # Se entrar aqui, significa que a lista 'acoes' está vazia ou zerada
-        st.warning("⚠️ O gráfico não apareceu porque o sistema não encontrou nenhuma ação cadastrada na tabela para contabilizar.")
+    # Desenha o gráfico de pizza
+    ax.pie(
+        valores, 
+        labels=labels, 
+        autopct='%1.1f%%', 
+        startangle=90, 
+        colors=cores, 
+        textprops={'fontsize': 10}
+    )
+    ax.axis('equal') # Garante que a pizza saia perfeitamente redonda
+    
+    # Renderiza o gráfico do matplotlib de forma limpa no Streamlit
+    st.pyplot(fig)
 else:
-    st.info("💡 Nenhuma ação encontrada no banco de dados. Cadastre uma ação abaixo para ativar o gráfico.")
+    # Caso a tabela esteja vazia, mostra uma dica visual para o usuário
+    st.info("💡 O gráfico de pizza será exibido assim que você cadastrar a primeira ação no painel abaixo.")
+
 
 # --- LISTAGEM DOS ITENS SALVOS ---
 st.write("---")
