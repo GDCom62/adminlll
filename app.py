@@ -3,36 +3,44 @@ import pandas as pd
 import base64
 import os
 import io
-from supabase import create_client, Client  # Substituído mysql.connector por Supabase
-
-# Bibliotecas para geração de PDF
-from reportlab.lib.pagesizes import landscape, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
+import matplotlib.pyplot as plt # Nova biblioteca para o gráfico de pizza
+from supabase import create_client, Client
 
 # Configuração da página Streamlit
 st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 
-# CONFIGURAÇÃO DO LOGIN FIXO
-USUARIO_FIXO = "admin"
-SENHA_FIXA = "123"
-
 # CONEXÃO DIRETA COM O SUPABASE
-# Substitua com as suas credenciais reais do painel do Supabase (Project Settings > API)
 SUPABASE_URL = "https://supabase.co"
 SUPABASE_KEY = "sua-chave-anonima-longa-aqui"
 
 def get_supabase_client() -> Client:
-    """Inicializa e retorna o cliente do Supabase."""
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Função isolada para salvar ou atualizar dados no Banco de Dados
-def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status):
+# Função para fazer upload de arquivos no Storage
+def fazer_upload_storage(arquivo_upload):
+    if arquivo_upload is not None:
+        try:
+            supabase = get_supabase_client()
+            bytes_data = arquivo_upload.getvalue()
+            # Nome único para o arquivo
+            nome_arquivo = f"{pd.Timestamp.now().strftime('%Y%m%d%H%M%S')}_{arquivo_upload.name}"
+            
+            # Upload para o bucket 'arquivos_acoes'
+            supabase.storage.from_("arquivos_acoes").upload(nome_arquivo, bytes_data)
+            
+            # Pega a URL pública do arquivo
+            url_publica = supabase.storage.from_("arquivos_acoes").get_public_url(nome_arquivo)
+            return url_publica
+        except Exception as e:
+            st.error(f"Erro ao subir arquivo: {e}")
+            return None
+    return None
+
+# Função para salvar ou atualizar dados no Banco de Dados
+def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, url_arq):
     try:
         supabase = get_supabase_client()
         
-        # Cria o dicionário com os dados no formato que o Supabase/PostgreSQL espera
         dados_acao = {
             "descricao_acao": descricao,
             "porque": v_porque,
@@ -41,50 +49,18 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
             "prazo": prazo_str,
             "como": v_como,
             "quando_detalhe": v_quando,
-            "status": status
+            "status": status,
+            "url_arquivo": url_arq
         }
         
         if id_limpo and id_limpo.isdigit():
-            # Query de Edição (UPDATE) no Supabase
-            # Filtra pelo ID da ação e atualiza os dados
             resposta = supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
         else:
-            # Query de Criação (INSERT) no Supabase
             resposta = supabase.table("Acoes").insert(dados_acao).execute()
             
         return True, "Operação realizada com sucesso!"
     except Exception as e:
         return False, f"Erro ao salvar no Supabase: {str(e)}"
-
-# Função para gerar PDF
-def gerar_pdf(acoes):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
-    elements = []
-    styles = getSampleStyleSheet()
-    elements.append(Paragraph("PLANO DE AÇÃO ADMINISTRATIVO", styles['Title']))
-    elements.append(Spacer(1, 12))
-
-    data = [["ID", "Ação (What)", "Prazo", "Status", "Por que", "Onde", "Como", "Quando Det."]]
-    for a in acoes:
-        data.append([
-            str(a['id_acao']), str(a['descricao_acao']), str(a['prazo']), 
-            str(a['status']), str(a['porque']), str(a['onde']), 
-            str(a['como']), str(a['quando_detalhe'])
-        ])
-
-    # Larguras reais em pontos definidas explicitamente
-    t = Table(data, colWidths=[40, 160, 70, 80, 120, 100, 120, 100])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.navy),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-    ]))
-    elements.append(t)
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer.getvalue()
 
 # Inicializa o estado de login e edição
 if 'logado' not in st.session_state:
@@ -92,7 +68,7 @@ if 'logado' not in st.session_state:
 if 'edit_item' not in st.session_state:
     st.session_state['edit_item'] = None
 
-# --- TELA DE LOGIN ---
+# --- TELA DE LOGIN REAL COM SUPABASE ---
 if not st.session_state['logado']:
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
@@ -104,15 +80,19 @@ if not st.session_state['logado']:
     col_b1, col_b2, col_b3 = st.columns(3)
     with col_b2:
         st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
-        usuario = st.text_input("Usuário", key="login_user")
+        email = st.text_input("E-mail cadastrado", key="login_email")
         senha = st.text_input("Senha", type="password", key="login_pass")
         
         if st.button("Entrar", use_container_width=True, key="btn_entrar"):
-            if usuario == USUARIO_FIXO and senha == SENHA_FIXA:
-                st.session_state['logado'] = True
-                st.rerun()
-            else:
-                st.error("Usuário ou senha incorretos.")
+            try:
+                supabase = get_supabase_client()
+                # Autenticação real na API do Supabase
+                auth_res = supabase.auth.sign_in_with_password({"email": email, "password": senha})
+                if auth_res.user:
+                    st.session_state['logado'] = True
+                    st.rerun()
+            except Exception:
+                st.error("E-mail ou senha incorretos no Supabase.")
     st.stop()
 
 # --- PAINEL PRINCIPAL ---
@@ -122,51 +102,45 @@ with col_tit:
 with col_log:
     st.write("<br>", unsafe_allow_html=True)
     if st.button("Sair (Logout)", use_container_width=True, key="btn_logout"):
+        supabase = get_supabase_client()
+        supabase.auth.sign_out() # Desconecta da sessão real
         st.session_state['logado'] = False
         st.session_state['edit_item'] = None
         st.rerun()
 
 # Buscar dados do banco Supabase
 acoes = []
-erro_banco = None
 try:
     supabase = get_supabase_client()
-    # Executa a busca ordenando pelo prazo de forma ascendente
-    resposta = supabase.table("Acoes").select(
-        "id_acao, descricao_acao, porque, onde, id_responsavel, prazo, como, quando_detalhe, status"
-    ).order("prazo", ascending=True).execute()
-    
-    # Atribui os dados retornados à lista de ações
+    resposta = supabase.table("Acoes").select("*").order("prazo", ascending=True).execute()
     acoes = resposta.data
 except Exception as e:
-    erro_banco = str(e)
+    st.error(f"Erro de conexão com o Supabase: {e}")
 
-if erro_banco:
-    st.error(f"Erro de conexão com o Supabase: {erro_banco}")
-
-# --- INDICADORES GRÁFICOS ---
+# --- INDICADORES GRÁFICOS (PIZZA) ---
 st.write("---")
-st.subheader("📊 Gráfico de Monitoramento de Status")
+st.subheader("📊 Distribuição de Status (Monitoramento)")
 
 status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
 if acoes:
     for a in acoes:
-        status_atual = a['status']
+        status_atual = a.get('status', 'Não Iniciado')
         if status_atual in status_contagem:
             status_contagem[status_atual] += 1
 
-df_grafico = pd.DataFrame(list(status_contagem.items()), columns=["Status", "Quantidade"])
-st.bar_chart(df_grafico, x="Status", y="Quantidade", color="#1f77b4")
-
-if acoes:
-    pdf_data = gerar_pdf(acoes)
-    st.download_button(
-        label="📄 Gerar e Baixar PDF",
-        data=pdf_data,
-        file_name="Plano_Lavo_Levo.pdf",
-        mime="application/pdf",
-        key="btn_download_pdf"
-    )
+    # Criação do gráfico em pizza com Matplotlib
+    labels = list(status_contagem.keys())
+    valores = list(status_contagem.values())
+    cores = ['#ff9999','#66b3ff','#99ff99'] # Vermelho claro, Azul, Verde claro
+    
+    fig, ax = plt.subplots(figsize=(4, 4))
+    # Só gera a pizza se houver algum dado inserido para evitar divisões por zero
+    if sum(valores) > 0:
+        ax.pie(valores, labels=labels, autopct='%1.1f%%', startangle=90, colors=cores, textprops={'fontsize': 10})
+        ax.axis('equal')  
+        st.pyplot(fig)
+    else:
+        st.info("Adicione ações para visualizar o gráfico em pizza.")
 
 # --- LISTAGEM DOS ITENS SALVOS ---
 st.write("---")
@@ -174,9 +148,8 @@ st.subheader("📋 Ações Registradas")
 
 if acoes:
     df_tabela = pd.DataFrame(acoes)
-    # Garante a ordem correta das colunas conforme o DataFrame original
-    df_tabela = df_tabela[["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status"]]
-    df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status"]
+    df_tabela = df_tabela[["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]]
+    df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
     st.write("**Ações de Gerenciamento:**")
@@ -196,24 +169,18 @@ if acoes:
         if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item"):
             try:
                 supabase = get_supabase_client()
-                # Comando DELETE filtrando pelo ID da ação selecionada
                 supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
-                
-                st.success(f"Ação ID #{id_selecionado} excluída com sucesso!")
-                if st.session_state['edit_item'] and st.session_state['edit_item']['id_acao'] == id_selecionado:
-                    st.session_state['edit_item'] = None
+                st.success(f"Ação ID #{id_selecionado} excluída!")
                 st.rerun()
             except Exception as e:
-                st.error(f"Erro ao excluir no Supabase: {e}")
-else:
-    st.info("Nenhuma ação cadastrada no sistema até o momento.")
+                st.error(f"Erro ao excluir: {e}")
 
 st.write("---")
 
 # --- CONFIGURAÇÃO DE VALORES PADRÃO ---
 valores_padrao = {
     "id": "", "descricao": "", "porque": "", "onde": "", 
-    "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None
+    "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
 }
 
 if st.session_state['edit_item']:
@@ -227,35 +194,48 @@ if st.session_state['edit_item']:
         "como": str(item['como']) if item['como'] else "",
         "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
         "status": str(item['status']),
-        "prazo": item['prazo']
+        "prazo": item['prazo'],
+        "url_arquivo": item.get('url_arquivo')
     }
     st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
-    
-    if st.button("❌ Cancelar Modo Edição e Voltar ao Novo Cadastro", use_container_width=True, key="btn_cancelar_edicao"):
-        st.session_state['edit_item'] = None
-        st.rerun()
 
-# --- PAINEL OPERACIONAL DIRETO (SEM ST.FORM) ---
+# --- PAINEL OPERACIONAL ---
 st.subheader("Painel: Registrar Informações")
 
-id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id")
-descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"], key="input_desc")
-porque = st.text_input("Por que", value=valores_padrao["porque"], key="input_porque")
-onde = st.text_input("Onde", value=valores_padrao["onde"], key="input_onde")
-responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"], key="input_resp")
+id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
+descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
+porque = st.text_input("Por que", value=valores_padrao["porque"])
+onde = st.text_input("Onde", value=valores_padrao["onde"])
+responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"])
 
-# Conversão da data vinda do Supabase para o formato date do Python
-try:
-    prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
-except Exception:
-    prazo_val = pd.Timestamp.now().date()
+prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
+prazo = st.date_input("Prazo *", value=prazo_val)
 
-prazo = st.date_input("Prazo *", value=prazo_val, key="input_prazo")
-
-como = st.text_input("Como", value=valores_padrao["como"], key="input_como")
-quando_detalhe = st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"], key="input_quando")
+como = st.text_input("Como", value=valores_padrao["como"])
+quando_detalhe = str(st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"]))
 
 lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
+status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]))
 
+# Campo de Upload de Arquivos
+arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
 
-lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
+if st.button("💾 Salvar Dados", use_container_width=True):
+    if not descricao:
+        st.error("O campo 'Descrição (O que)' é obrigatório.")
+    else:
+        url_doc = valores_padrao["url_arquivo"]
+        if arquivo_enviado:
+            st.info("Efetuando upload do arquivo...")
+            url_doc = fazer_upload_storage(arquivo_enviado)
+            
+        sucesso, msg = salvar_acao_no_banco(
+            id_acao, descricao, porque, onde, responsavel_id_input, 
+            str(prazo), como, quando_detalhe, status_selecionado, url_doc
+        )
+        if sucesso:
+            st.success(msg)
+            st.session_state['edit_item'] = None
+            st.rerun()
+        else:
+            st.error(msg)
