@@ -159,44 +159,37 @@ except Exception as e:
 
     st.write("<br>", unsafe_allow_html=True)
 
-         # Renderização do Gráfico de Pizza/Rosca (Versão Simplificada à Prova de Falhas)
-    if total_acoes > 0:
-        # Criamos a tabela para o gráfico usando contagem direta em lista do Python
-        dados_finais_grafico = []
-        for nome_status, qtd in status_contagem.items():
-            # Só adiciona no gráfico os status que possuem pelo menos 1 item cadastrado
-            if qtd > 0:
-                dados_finais_grafico.append({"Status": nome_status, "Quantidade": qtd})
-        
-        df_contagem_limpo = pd.DataFrame(dados_finais_grafico)
+             # Renderização do Gráfico Nativo (Substituição Definitiva à Prova de Falhas)
+    st.write("---")
+    st.write("📊 **Progresso dos Planos de Ação**")
+    
+    # Criamos a tabela de forma simplificada a partir dos dados já calculados
+    dados_barras = {
+        "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
+        "Quantidade": [
+            status_contagem.get("Não Iniciado", 0),
+            status_contagem.get("Em Andamento", 0),
+            status_contagem.get("Concluído", 0)
+        ]
+    }
+    df_barras_limpo = pd.DataFrame(dados_barras)
 
-        # Se houver dados válidos na tabela, desenha o gráfico com segurança
-        if not df_contagem_limpo.empty:
-            fig_pizza = px.pie(
-                df_contagem_limpo, 
-                values='Quantidade', 
-                names='Status', 
-                hole=0.4,
-                color='Status',
-                color_discrete_map={
-                    'Não Iniciado': '#ff9999',
-                    'Em Andamento': '#66b3ff',
-                    'Concluído': '#99ff99'
-                }
-            )
-            
-            fig_pizza.update_layout(
-                width=450, 
-                height=320, 
-                margin=dict(l=10, r=10, t=10, b=10),
-                legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5)
-            )
-            st.plotly_chart(fig_pizza, use_container_width=False)
-        else:
-            st.info("💡 Adicione quantidades válidas aos status para gerar o gráfico.")
+    # Exibe o gráfico de barras vertical nativo do Streamlit (Sem Plotly, Sem Matplotlib)
+    if df_barras_limpo["Quantidade"].sum() > 0:
+        st.bar_chart(
+            df_barras_limpo, 
+            x="Status", 
+            y="Quantidade", 
+            color="Status",
+            # Mapeamento estético de cores direto no componente nativo
+            color_config={
+                "Não Iniciado": "#ff9999",  # Vermelho suave
+                "Em Andamento": "#66b3ff",  # Azul suave
+                "Concluído": "#99ff99"     # Verde suave
+            }
+        )
     else:
-        st.info("💡 Nenhuma ação corresponde aos filtros selecionados na barra lateral.")
-
+        st.info("💡 Cadastre ou selecione ações para visualizar o gráfico de barras de monitoramento.")
 
 # --- LISTAGEM DOS ITENS SALVOS ---
 st.write("---")
