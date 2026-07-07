@@ -159,13 +159,16 @@ except Exception as e:
 
     st.write("<br>", unsafe_allow_html=True)
 
-    # Renderização do Gráfico de Pizza/Rosca
+        # Renderização do Gráfico de Pizza/Rosca (Versão Corrigida e Estável)
     if total_acoes > 0:
-        df_pizza = pd.DataFrame(lista_status_banco, columns=["Status"]).value_counts().reset_index()
-        df_pizza.columns = ["Status", "Quantidade"]
+        # Cria a contagem agrupada de forma direta e limpa
+        df_pizza = pd.DataFrame(lista_status_banco, columns=["Status_Item"])
+        df_contagem = df_pizza["Status_Item"].value_counts().reset_index()
+        df_contagem.columns = ["Status", "Quantidade"]
 
+        # Gera o gráfico usando as colunas corrigidas
         fig_pizza = px.pie(
-            df_pizza, 
+            df_contagem, 
             values='Quantidade', 
             names='Status', 
             hole=0.4,
@@ -177,6 +180,8 @@ except Exception as e:
                 'Concluido': '#99ff99'
             }
         )
+        
+        # Ajustes de layout para garantir exibição perfeita na tela
         fig_pizza.update_layout(
             width=450, 
             height=320, 
@@ -186,6 +191,7 @@ except Exception as e:
         st.plotly_chart(fig_pizza, use_container_width=False)
     else:
         st.info("💡 Nenhuma ação corresponde aos filtros selecionados na barra lateral.")
+
 
 # --- LISTAGEM DOS ITENS SALVOS ---
 st.write("---")
