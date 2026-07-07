@@ -114,23 +114,56 @@ try:
 except Exception as e:
     st.error(f"Erro ao carregar dados do Supabase: {e}")
 
-# --- INDICADORES GRÁFICOS (PIZZA DINÂMICA) ---
-st.write("---")
-st.subheader("📊 Distribuição de Status (Monitoramento)")
+    # --- INDICADORES GRÁFICOS E METRICAS TURBINADAS ---
+    st.write("---")
+    st.subheader("📊 Painel de Monitoramento Geral")
 
-if acoes:
+    # Cálculos para os cartões de métricas
+    total_acoes = len(acoes_filtradas)
+    concluidas = 0
+    atrasadas = 0
+    hoje = pd.Timestamp.now().date()
+
     lista_status_banco = []
-    for a in acoes:
-        status_texto = a.get('status')
-        if status_texto:
-            lista_status_banco.append(str(status_texto).strip().title())
+    for a in acoes_filtradas:
+        status_texto = str(a.get('status', 'Não Iniciado')).strip().title()
+        lista_status_banco.append(status_texto)
+        
+        # Contabiliza concluídas
+        if "Concluído" in status_texto or "Concluido" in status_texto:
+            concluidas += 1
+            
+        # Contabiliza atrasadas (prazo menor que hoje e não concluída)
+        try:
+            data_prazo = pd.to_datetime(a.get('prazo')).date()
+            if data_prazo < hoje and "Concluid" not in status_texto:
+                atrasadas += 1
+        except:
+            pass
+
+    # Calcula a taxa de eficiência em porcentagem
+    taxa_conclusao = (concluidas / total_acoes * 100) if total_acoes > 0 else 0.0
+
+    # Layout de 3 colunas para exibir os cartões na tela
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric(label="📋 Total de Ações Filtradas", value=f"{total_acoes} itens")
+    with m2:
+        st.metric(label="✅ Taxa de Conclusão", value=f"{taxa_conclusao:.1f}%")
+    with m3:
+        # Destaca em vermelho se houver ações críticas atrasadas
+        if atrasadas > 0:
+            st.metric(label="🚨 Ações Críticas (Atrasadas)", value=f"{atrasadas} pendentes", delta="- Atenção urgente", delta_color="inverse")
         else:
-            lista_status_banco.append("Não Iniciado")
+            st.metric(label="🛡️ Prazos sob Controle", value="0 atrasos", delta="Em dia")
 
-    df_pizza = pd.DataFrame(lista_status_banco, columns=["Status"]).value_counts().reset_index()
-    df_pizza.columns = ["Status", "Quantidade"]
+    st.write("<br>", unsafe_allow_html=True)
 
-    if df_pizza["Quantidade"].sum() > 0:
+    # Renderização do Gráfico de Pizza/Rosca
+    if total_acoes > 0:
+        df_pizza = pd.DataFrame(lista_status_banco, columns=["Status"]).value_counts().reset_index()
+        df_pizza.columns = ["Status", "Quantidade"]
+
         fig_pizza = px.pie(
             df_pizza, 
             values='Quantidade', 
@@ -146,15 +179,13 @@ if acoes:
         )
         fig_pizza.update_layout(
             width=450, 
-            height=350, 
-            margin=dict(l=20, r=20, t=20, b=20),
+            height=320, 
+            margin=dict(l=10, r=10, t=10, b=10),
             legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5)
         )
         st.plotly_chart(fig_pizza, use_container_width=False)
     else:
-        st.info("💡 Nenhuma quantidade válida encontrada para gerar as fatias do gráfico.")
-else:
-    st.info("💡 Insira ou altere o status de uma ação para visualizar as fatias do gráfico de pizza.")
+        st.info("💡 Nenhuma ação corresponde aos filtros selecionados na barra lateral.")
 
 # --- LISTAGEM DOS ITENS SALVOS ---
 st.write("---")
@@ -220,8 +251,9 @@ if st.session_state['edit_item']:
     }
     st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
 
-# --- PAINEL OPERACIONAL ---
-st.subheader("Painel: Registrar Informações")
+# --- PAINEL OPERACIONAL (ATUALIZADO COM FLUXO DE EDIÇÃO CORRETO) ---
+st.write("---")
+st.subheader("📝 Painel: Registrar Informações")
 
 id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
 descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
@@ -238,3 +270,55 @@ quando_detalhe = str(st.text_input("Quando (Detalhe)", value=valores_padrao["qua
 lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
 status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0)
 
+arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
+
+# --- LÓGICA INTELIGENTE DE BOTÕES (SALVAR VS ATUALIZAR) ---
+if st.session_state['edit_item']:
+    # Se você clicou em editar, aparecem os botões de controle de alteração
+    col_salvar, col_cancelar = st.columns(2)
+    
+    with col_salvar:
+        btn_atualizar = st.button("🔄 Confirmar e Salvar Alterações", use_container_width=True, type="primary")
+    with col_cancelar:
+        btn_cancelar = st.button("❌ Cancelar Edição (Voltar ao Novo)", use_container_width=True)
+        
+    if btn_cancelar:
+        st.session_state['edit_item'] = None
+        st.rerun()
+        
+    if btn_atualizar:
+        if not descricao:
+            st.error("O campo 'Descrição (O que)' é obrigatório.")
+        else:
+            url_doc = valores_padrao["url_arquivo"]
+            if arquivo_enviado:
+                url_doc = fazer_upload_storage(arquivo_enviado)
+                
+            # Envia o ID para a função fazer o UPDATE no Supabase
+            sucesso, msg = salvar_acao_no_banco(
+                id_acao, descricao, porque, onde, responsavel_id_input, 
+                str(prazo), como, quando_detalhe, status_selecionado, url_doc
+            )
+            if sucesso:
+                st.success("Alterações salvas com sucesso!")
+                st.session_state['edit_item'] = None  # Sai do modo edição
+                st.rerun()
+                
+else:
+    # Se você NÃO está editando, exibe o botão padrão de novo cadastro
+    if st.button("💾 Salvar Novo Cadastro", use_container_width=True, type="primary"):
+        if not descricao:
+            st.error("O campo 'Descrição (O que)' é obrigatório.")
+        else:
+            url_doc = None
+            if arquivo_enviado:
+                url_doc = fazer_upload_storage(arquivo_enviado)
+                
+            # Como ID vai vazio, a função faz um INSERT automático no Supabase
+            sucesso, msg = salvar_acao_no_banco(
+                "", descricao, porque, onde, responsavel_id_input, 
+                str(prazo), como, quando_detalhe, status_selecionado, url_doc
+            )
+            if sucesso:
+                st.success("Nova ação cadastrada com sucesso!")
+                st.rerun()
