@@ -116,7 +116,7 @@ if st.session_state['edit_item']:
 # --- TÍTULO DO PAINEL PRINCIPAL ---
 st.title("Plano de Ação Lavo e Levo")
 
-# --- PAINEL OPERACIONAL INSERÇÃO / EDICAO NO TOPO ---
+# --- PAINEL OPERACIONAL ---
 st.write("---")
 st.subheader("📝 Painel: Registrar ou Modificar Informações")
 
@@ -184,7 +184,7 @@ else:
                 st.rerun()
 
 # ==============================================================================
-# LEITURA DO BANCO E FILTRAGEM (RODA APÓS CONFORMAÇÃO DOS BOTÕES)
+# LEITURA DO BANCO E FILTRAGEM (RODA EM SEQUÊNCIA DIRETA)
 # ==============================================================================
 acoes = []
 try:
