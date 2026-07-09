@@ -224,10 +224,15 @@ if st.sidebar.button("🚪 Sair do Sistema (Logout)", use_container_width=True, 
     st.session_state['edit_item'] = None
     st.rerun()
 
-# Processamento seguro dos filtros avançados
+# Processamento seguro dos filtros avançados (Sincronização Total)
 acoes_filtradas = acoes if acoes else []
 
+# 1. Aplica o filtro de Status selecionado na barra lateral
 if acoes_filtradas and filtro_status:
-    status_permitidos = [s.title() for s in filtro_status]
-    acoes_filtradas = [a for a in acoes_filtradas if str(a.get('status', 'Não Iniciado')).strip().title() in status_permitidos]
+    status_permitidos = [s.strip().lower() for s in filtro_status]
+    acoes_filtradas = [a for a in acoes_filtradas if str(a.get('status', 'Não Iniciado')).strip().lower() in status_permitidos]
     
+# 2. Aplica o filtro por ID do Responsável na barra lateral
+if acoes_filtradas and filtro_resp != "Todos":
+    # Convertemos ambos para string para garantir que a comparação seja idêntica
+    acoes_filtradas = [a for a in acoes_filtradas if str(a.get('id_responsavel', '')).strip() == str(filtro_resp).strip()]
