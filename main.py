@@ -29,7 +29,6 @@ def fazer_upload_storage(arquivo_upload):
             supabase = get_supabase_client()
             bytes_data = arquivo_upload.getvalue()
             nome_arquivo = f"{pd.Timestamp.now().strftime('%Y%m%d%H%M%S')}_{arquivo_upload.name}"
-            # Envia o arquivo para o bucket
             supabase.storage.from_("arquivos_acoes").upload(nome_arquivo, bytes_data)
             url_publica = supabase.storage.from_("arquivos_acoes").get_public_url(nome_arquivo)
             return url_publica
@@ -217,7 +216,7 @@ else:
         st.session_state['edit_item'] = None
         st.rerun()
 
-    # Processamento seguro dos filtros selecionados
+    # Processamento seguro e perfeitamente indentado dos filtros selecionados
     acoes_filtradas = []
     if acoes:
         for a in acoes:
