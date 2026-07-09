@@ -17,7 +17,7 @@ def get_supabase_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- FUNÇÃO ISOLADA PARA GERAR O RELATÓRIO PDF ---
-def generar_pdf_atualizado(dados_acoes):
+def gerar_pdf_atualizado(dados_acoes):
     buffer_pdf = io.BytesIO()
     from reportlab.lib.pagesizes import landscape, A4
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -43,7 +43,7 @@ def generar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    # Larguras numéricas em pontos definidas explicitamente para a folha deitada (Landscape)
+    # Larguras numéricas fixas em pontos para a folha A4 em modo paisagem (horizontal)
     t = Table(dados_pdf, colWidths=[40, 160, 70, 80, 120, 100, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
@@ -245,8 +245,8 @@ if acoes:
     df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
-    # Botão do Relatório PDF usando a função isolada lá do topo
-    pdf_data = generar_pdf_atualizado(acoes)
+    # Gerador de Relatório PDF Integrado (Chamando a função corrigida do topo)
+    pdf_data = gerar_pdf_atualizado(acoes)
     st.download_button(
         label="📄 Gerar e Baixar Relatório (PDF)",
         data=pdf_data,
