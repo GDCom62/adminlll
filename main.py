@@ -3,16 +3,15 @@ import pandas as pd
 import base64
 import os
 import io
-import plotly.express as px  # Biblioteca nativa e estável para o gráfico
 from supabase import create_client, Client
 
-# Configuração da página Streamlit (DEVE SER A PRIMEIRA LINHA DE CÓDIGO)
-st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
+# Configuração da página Streamlit (DEVE SER A PRIMEIRA LINHA)
+st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Lembre-se de preencher com a URL e KEY corretas do seu projeto
-SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
-SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
+# Lembre-se de manter as suas credenciais reais aqui!
+SUPABASE_URL = "https://supabase.co" 
+SUPABASE_KEY = "sua-chave-anonima-longa-real-aqui"
 
 def get_supabase_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -75,7 +74,6 @@ if not st.session_state['logado']:
             
         st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
         
-        # O uso de st.form impede que a nuvem limpe a sessão antes da validação
         with st.form(key="formulario_login"):
             usuario_input = st.text_input("Usuário")
             senha_input = st.text_input("Senha", type="password")
@@ -94,16 +92,8 @@ if not st.session_state['logado']:
 # SISTEMA PRINCIPAL (SÓ CARREGA SE LOGADO)
 # ==============================================================================
 
-# --- PAINEL PRINCIPAL ---
-col_tit, col_log = st.columns(2)
-with col_tit:
-    st.title("Plano de Ação-Administrativo")
-with col_log:
-    st.write("<br>", unsafe_allow_html=True)
-    if st.button("Sair (Logout)", use_container_width=True, key="btn_logout_final"):
-        st.session_state['logado'] = False
-        st.session_state['edit_item'] = None
-        st.rerun()
+# --- BARRA LATERAL (SIDEBAR) COM FILTROS AVANÇADOS ---
+st.sidebar.header("🔍 Filtros Avançados")
 
 # Buscar dados do banco Supabase de forma protegida
 acoes = []
@@ -114,26 +104,60 @@ try:
 except Exception as e:
     st.error(f"Erro ao carregar dados do Supabase: {e}")
 
-    # --- INDICADORES GRÁFICOS E METRICAS TURBINADAS ---
-    st.write("---")
-    st.subheader("📊 Painel de Monitoramento Geral")
+# Filtro de Status na Sidebar
+filtro_status = st.sidebar.multiselect(
+    "Filtrar por Status:", 
+    ["Não Iniciado", "Em Andamento", "Concluído"], 
+    default=["Não Iniciado", "Em Andamento", "Concluído"]
+)
 
-    # Cálculos para os cartões de métricas
-    total_acoes = len(acoes_filtradas)
-    concluidas = 0
-    atrasadas = 0
-    hoje = pd.Timestamp.now().date()
+# Filtro de Responsável na Sidebar
+responsáveis_disponiveis = sorted(list(set([str(a.get('id_responsavel', '1')) for a in acoes]))) if acoes else ["Todos"]
+filtro_resp = st.sidebar.selectbox("Filtrar por ID do Responsável:", ["Todos"] + responsáveis_disponiveis)
 
-    lista_status_banco = []
+# Aplicar os Filtros na lista de ações
+acoes_filtradas = acoes
+if acoes:
+    if filtro_status:
+        acoes_filtradas = [a for a in acoes_filtradas if str(a.get('status', 'Não Iniciado')).strip().title() in [s.title() for s in filtro_status]]
+    if filtro_resp != "Todos":
+        acoes_filtradas = [a for a in acoes_filtradas if str(a.get('id_responsavel', '1')) == filtro_resp]
+
+# Botão de Logout na lateral
+st.sidebar.write("---")
+if st.sidebar.button("🚪 Sair do Sistema (Logout)", use_container_width=True):
+    st.session_state['logado'] = False
+    st.session_state['edit_item'] = None
+    st.rerun()
+
+# --- TÍTULO DO PAINEL PRINCIPAL ---
+st.title("Plano de Ação Lavo e Levo")
+
+# --- PAINEL DE MONITORAMENTO E MÉTRICAS ---
+st.write("---")
+st.subheader("📊 Painel de Monitoramento Geral")
+
+# Dicionário de contagem criado corretamente no início do bloco
+status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
+total_acoes = len(acoes_filtradas)
+concluidas = 0
+atrasadas = 0
+hoje = pd.Timestamp.now().date()
+
+if acoes_filtradas:
     for a in acoes_filtradas:
         status_texto = str(a.get('status', 'Não Iniciado')).strip().title()
-        lista_status_banco.append(status_texto)
         
-        # Contabiliza concluídas
-        if "Concluído" in status_texto or "Concluido" in status_texto:
+        # Faz a contagem correta para o gráfico de barras
+        if "Andamento" in status_texto:
+            status_contagem["Em Andamento"] += 1
+        elif "Concluido" in status_texto or "Concluído" in status_texto:
+            status_contagem["Concluído"] += 1
             concluidas += 1
+        else:
+            status_contagem["Não Iniciado"] += 1
             
-        # Contabiliza atrasadas (prazo menor que hoje e não concluída)
+        # Calcula se está atrasado
         try:
             data_prazo = pd.to_datetime(a.get('prazo')).date()
             if data_prazo < hoje and "Concluid" not in status_texto:
@@ -141,188 +165,95 @@ except Exception as e:
         except:
             pass
 
-    # Calcula a taxa de eficiência em porcentagem
-    taxa_conclusao = (concluidas / total_acoes * 100) if total_acoes > 0 else 0.0
+taxa_conclusao = (concluidas / total_acoes * 100) if total_acoes > 0 else 0.0
 
-    # Layout de 3 colunas para exibir os cartões na tela
-    m1, m2, m3 = st.columns(3)
-    with m1:
-        st.metric(label="📋 Total de Ações Filtradas", value=f"{total_acoes} itens")
-    with m2:
-        st.metric(label="✅ Taxa de Conclusão", value=f"{taxa_conclusao:.1f}%")
-    with m3:
-        # Destaca em vermelho se houver ações críticas atrasadas
-        if atrasadas > 0:
-            st.metric(label="🚨 Ações Críticas (Atrasadas)", value=f"{atrasadas} pendentes", delta="- Atenção urgente", delta_color="inverse")
-        else:
-            st.metric(label="🛡️ Prazos sob Controle", value="0 atrasos", delta="Em dia")
-
-    st.write("<br>", unsafe_allow_html=True)
-
-             # Renderização do Gráfico Nativo (Substituição Definitiva à Prova de Falhas)
-    st.write("---")
-    st.write("📊 **Progresso dos Planos de Ação**")
-    
-    # Criamos a tabela de forma simplificada a partir dos dados já calculados
-    dados_barras = {
-        "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
-        "Quantidade": [
-            status_contagem.get("Não Iniciado", 0),
-            status_contagem.get("Em Andamento", 0),
-            status_contagem.get("Concluído", 0)
-        ]
-    }
-    df_barras_limpo = pd.DataFrame(dados_barras)
-
-    # Exibe o gráfico de barras vertical nativo do Streamlit (Sem Plotly, Sem Matplotlib)
-    if df_barras_limpo["Quantidade"].sum() > 0:
-        st.bar_chart(
-            df_barras_limpo, 
-            x="Status", 
-            y="Quantidade", 
-            color="Status",
-            # Mapeamento estético de cores direto no componente nativo
-            color_config={
-                "Não Iniciado": "#ff9999",  # Vermelho suave
-                "Em Andamento": "#66b3ff",  # Azul suave
-                "Concluído": "#99ff99"     # Verde suave
-            }
-        )
+# Exibição das Métricas em 3 colunas
+m1, m2, m3 = st.columns(3)
+with m1:
+    st.metric(label="📋 Total de Ações Filtradas", value=f"{total_acoes} itens")
+with m2:
+    st.metric(label="✅ Taxa de Conclusão", value=f"{taxa_conclusao:.1f}%")
+with m3:
+    if atrasadas > 0:
+        st.metric(label="🚨 Ações Críticas (Atrasadas)", value=f"{atrasadas} pendentes", delta="- Atenção urgente", delta_color="inverse")
     else:
-        st.info("💡 Cadastre ou selecione ações para visualizar o gráfico de barras de monitoramento.")
+        st.metric(label="🛡️ Prazos sob Controle", value="0 atrasos", delta="Em dia")
+
+st.write("<br>", unsafe_allow_html=True)
+
+# --- GRÁFICO DE BARRAS NATIVO E SEGURO ---
+if total_acoes > 0:
+    df_barras_limpo = pd.DataFrame({
+        "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
+        "Quantidade": [status_contagem["Não Iniciado"], status_contagem["Em Andamento"], status_contagem["Concluído"]]
+    })
+    
+    st.bar_chart(
+        df_barras_limpo, 
+        x="Status", 
+        y="Quantidade", 
+        color="Status",
+        color_config={
+            "Não Iniciado": "#ff9999",
+            "Em Andamento": "#66b3ff",
+            "Concluído": "#99ff99"
+        }
+    )
+else:
+    st.info("💡 Nenhuma ação corresponde aos filtros selecionados na barra lateral.")
 
 # --- LISTAGEM DOS ITENS SALVOS ---
 st.write("---")
 st.subheader("📋 Ações Registradas")
 
-if acoes:
-    df_tabela = pd.DataFrame(acoes)
+if acoes_filtradas:
+    df_tabela = pd.DataFrame(acoes_filtradas)
     colunas_necessarias = ["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]
     for col in colunas_necessarias:
         if col not in df_tabela.columns:
             df_tabela[col] = ""
             
     df_tabela = df_tabela[colunas_necessarias]
+    
+    # Marcador de alerta visual de atraso na tabela
+    prazos_com_alerta = []
+    for _, linha in df_tabela.iterrows():
+        try:
+            data_prazo = pd.to_datetime(linha['prazo']).date()
+            if data_prazo < hoje and str(linha['status']).strip().lower() != "concluído":
+                prazos_com_alerta.append(f"🚨 {linha['prazo']} (Atrasado)")
+            else:
+                prazos_com_alerta.append(str(linha['prazo']))
+        except:
+            prazos_com_alerta.append(str(linha['prazo']))
+            
+    df_tabela['prazo'] = prazos_com_alerta
     df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
+    # Relatório em Excel
+    buffer_excel = io.BytesIO()
+    with pd.ExcelWriter(buffer_excel, engine='openpyxl') as writer:
+        df_tabela.to_excel(writer, index=False, sheet_name='Plano de Ação')
+    
+    st.download_button(
+        label="📥 Baixar Relatório Filtrado (Excel)",
+        data=buffer_excel.getvalue(),
+        file_name="Plano_de_Acao_Lavo_Levo.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    
+    # Botões de Manutenção
     st.write("**Ações de Gerenciamento:**")
     col_sel, col_btn_ed, col_btn_ex = st.columns(3)
     
     with col_sel:
-        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_manutencao")
+        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes_filtradas], key="select_id_manutencao")
     
     with col_btn_ed:
-        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item"):
+        if st.button("✏️ Editar Selecionado", use_container_width=True):
             item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
             if item_procurado:
                 st.session_state['edit_item'] = item_procurado
                 st.rerun()
                 
-    with col_btn_ex:
-        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item"):
-            try:
-                supabase = get_supabase_client()
-                supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
-                st.success(f"Ação ID #{id_selecionado} excluída!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao excluir: {e}")
-else:
-    st.info("Nenhuma ação cadastrada no sistema até o momento.")
-
-st.write("---")
-
-# --- CONFIGURAÇÃO DE VALORES PADRÃO ---
-valores_padrao = {
-    "id": "", "descricao": "", "porque": "", "onde": "", 
-    "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
-}
-
-if st.session_state['edit_item']:
-    item = st.session_state['edit_item']
-    valores_padrao = {
-        "id": str(item['id_acao']),
-        "descricao": str(item['descricao_acao']),
-        "porque": str(item['porque']) if item['porque'] else "",
-        "onde": str(item['onde']) if item['onde'] else "",
-        "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
-        "como": str(item['como']) if item['como'] else "",
-        "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
-        "status": str(item['status']),
-        "prazo": item['prazo'],
-        "url_arquivo": item.get('url_arquivo')
-    }
-    st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
-
-# --- PAINEL OPERACIONAL (ATUALIZADO COM FLUXO DE EDIÇÃO CORRETO) ---
-st.write("---")
-st.subheader("📝 Painel: Registrar Informações")
-
-id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
-descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
-porque = st.text_input("Por que", value=valores_padrao["porque"])
-onde = st.text_input("Onde", value=valores_padrao["onde"])
-responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"])
-
-prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
-prazo = st.date_input("Prazo *", value=prazo_val)
-
-como = st.text_input("Como", value=valores_padrao["como"])
-quando_detalhe = str(st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"]))
-
-lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
-status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0)
-
-arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
-
-# --- LÓGICA INTELIGENTE DE BOTÕES (SALVAR VS ATUALIZAR) ---
-if st.session_state['edit_item']:
-    # Se você clicou em editar, aparecem os botões de controle de alteração
-    col_salvar, col_cancelar = st.columns(2)
-    
-    with col_salvar:
-        btn_atualizar = st.button("🔄 Confirmar e Salvar Alterações", use_container_width=True, type="primary")
-    with col_cancelar:
-        btn_cancelar = st.button("❌ Cancelar Edição (Voltar ao Novo)", use_container_width=True)
-        
-    if btn_cancelar:
-        st.session_state['edit_item'] = None
-        st.rerun()
-        
-    if btn_atualizar:
-        if not descricao:
-            st.error("O campo 'Descrição (O que)' é obrigatório.")
-        else:
-            url_doc = valores_padrao["url_arquivo"]
-            if arquivo_enviado:
-                url_doc = fazer_upload_storage(arquivo_enviado)
-                
-            # Envia o ID para a função fazer o UPDATE no Supabase
-            sucesso, msg = salvar_acao_no_banco(
-                id_acao, descricao, porque, onde, responsavel_id_input, 
-                str(prazo), como, quando_detalhe, status_selecionado, url_doc
-            )
-            if sucesso:
-                st.success("Alterações salvas com sucesso!")
-                st.session_state['edit_item'] = None  # Sai do modo edição
-                st.rerun()
-                
-else:
-    # Se você NÃO está editando, exibe o botão padrão de novo cadastro
-    if st.button("💾 Salvar Novo Cadastro", use_container_width=True, type="primary"):
-        if not descricao:
-            st.error("O campo 'Descrição (O que)' é obrigatório.")
-        else:
-            url_doc = None
-            if arquivo_enviado:
-                url_doc = fazer_upload_storage(arquivo_enviado)
-                
-            # Como ID vai vazio, a função faz um INSERT automático no Supabase
-            sucesso, msg = salvar_acao_no_banco(
-                "", descricao, porque, onde, responsavel_id_input, 
-                str(prazo), como, quando_detalhe, status_selecionado, url_doc
-            )
-            if sucesso:
-                st.success("Nova ação cadastrada com sucesso!")
-                st.rerun()
