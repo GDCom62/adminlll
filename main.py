@@ -116,7 +116,7 @@ if st.session_state['edit_item']:
 # --- TÍTULO DO PAINEL PRINCIPAL ---
 st.title("Plano de Ação Lavo e Levo")
 
-# --- PAINEL OPERACIONAL INSERÇÃO / EDICAO NO TOPO ---
+# --- PAINEL OPERACIONAL ---
 st.write("---")
 st.subheader("📝 Painel: Registrar ou Modificar Informações")
 
@@ -184,15 +184,23 @@ else:
                 st.rerun()
 
 # ==============================================================================
-# LEITURA DO BANCO E FILTRAGEM (RODA APÓS CONFORMAÇÃO DOS BOTÕES)
+# LEITURA DO BANCO (MUDANÇA DE SINTAXE DE EXTRAÇÃO PARA EVITAR LISTA VAZIA)
 # ==============================================================================
 acoes = []
 try:
     supabase = get_supabase_client()
-    resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
-    acoes = resposta.data
+    # Sem filtros adicionais de ordenação nativa para garantir a entrega dos dados
+    resposta = supabase.table("Acoes").select("*").execute()
+    
+    # Sintaxe universal: tenta ler via dicionário ou via atributo nativo
+    if hasattr(resposta, "data"):
+        acoes = resposta.data
+    elif isinstance(resposta, dict) and "data" in resposta:
+        acoes = resposta["data"]
+    else:
+        acoes = list(resposta)
 except Exception as e:
-    st.error(f"Erro ao carregar dados do Supabase: {e}")
+    st.error(f"Erro ao capturar dados do Supabase: {e}")
 
 # --- BARRA LATERAL (SIDEBAR) COM FILTROS AVANÇADOS ---
 st.sidebar.header("🔍 Filtros Avançados")
@@ -223,10 +231,3 @@ if acoes_filtradas and filtro_status:
     status_permitidos = [s.title() for s in filtro_status]
     acoes_filtradas = [a for a in acoes_filtradas if str(a.get('status', 'Não Iniciado')).strip().title() in status_permitidos]
     
-if acoes_filtradas and filtro_resp != "Todos":
-    acoes_filtradas = [a for a in acoes_filtradas if str(a.get('id_responsavel', '1')) == filtro_resp]
-
-# --- PAINEL DE MONITORAMENTO E MÉTRICAS ---
-st.write("---")
-st.subheader("📊 Painel de Monitoramento Geral")
-
