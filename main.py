@@ -177,7 +177,7 @@ else:
             
             sucesso, msg = salvar_acao_no_banco(
                 "", descricao, porque, onde, responsavel_id_input, 
-                str(prazo), como, when_detalhe=quando_detalhe, status=status_selecionado, url_arq=url_doc
+                str(prazo), como, quando_detalhe, status_selecionado, url_doc
             )
             if sucesso:
                 st.success("Nova ação cadastrada com sucesso!")
@@ -230,3 +230,4 @@ if acoes_filtradas and filtro_resp != "Todos":
 st.write("---")
 st.subheader("📊 Painel de Monitoramento Geral")
 
+status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
