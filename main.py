@@ -89,134 +89,142 @@ if not st.session_state['logado']:
     st.stop()
 
 # ==============================================================================
-# SISTEMA PRINCIPAL (SÓ CARREGA SE LOGADO)
+# SISTEMA PRINCIPAL (SÓ CARREGA SE LOGADO) - ESTRUTURA SEM BLOCO ELSE PAI
 # ==============================================================================
-else:
-    # --- CONFIGURAÇÃO DE VALORES PADRÃO (MODO EDIÇÃO) ---
+
+# --- CONFIGURAÇÃO DE VALORES PADRÃO (MODO EDIÇÃO) ---
+valores_padrao = {
+    "id": "", "descricao": "", "porque": "", "onde": "", 
+    "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
+}
+
+if st.session_state['edit_item']:
+    item = st.session_state['edit_item']
     valores_padrao = {
-        "id": "", "descricao": "", "porque": "", "onde": "", 
-        "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
+        "id": str(item['id_acao']),
+        "descricao": str(item['descricao_acao']),
+        "porque": str(item['porque']) if item['porque'] else "",
+        "onde": str(item['onde']) if item['onde'] else "",
+        "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
+        "como": str(item['como']) if item['como'] else "",
+        "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
+        "status": str(item['status']),
+        "prazo": item['prazo'],
+        "url_arquivo": item.get('url_arquivo')
     }
 
-    if st.session_state['edit_item']:
-        item = st.session_state['edit_item']
-        valores_padrao = {
-            "id": str(item['id_acao']),
-            "descricao": str(item['descricao_acao']),
-            "porque": str(item['porque']) if item['porque'] else "",
-            "onde": str(item['onde']) if item['onde'] else "",
-            "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
-            "como": str(item['como']) if item['como'] else "",
-            "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
-            "status": str(item['status']),
-            "prazo": item['prazo'],
-            "url_arquivo": item.get('url_arquivo')
-        }
+# --- TÍTULO DO PAINEL PRINCIPAL ---
+st.title("Plano de Ação Lavo e Levo")
 
-    # --- TÍTULO DO PAINEL PRINCIPAL ---
-    st.title("Plano de Ação Lavo e Levo")
+# --- PAINEL OPERACIONAL NO TOPO ---
+st.write("---")
+st.subheader("📝 Painel: Registrar ou Modificar Informações")
 
-    # --- PAINEL OPERACIONAL NO TOPO ---
-    st.write("---")
-    st.subheader("📝 Painel: Registrar ou Modificar Informações")
+id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="form_id_acao")
+descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"], key="form_desc_acao")
+porque = st.text_input("Por que", value=valores_padrao["porque"], key="form_porque_acao")
+onde = st.text_input("Onde", value=valores_padrao["onde"], key="form_onde_acao")
+responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"], key="form_resp_acao")
 
-    id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="form_id_acao")
-    descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"], key="form_desc_acao")
-    porque = st.text_input("Por que", value=valores_padrao["porque"], key="form_porque_acao")
-    onde = st.text_input("Onde", value=valores_padrao["onde"], key="form_onde_acao")
-    responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"], key="form_resp_acao")
+prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
+prazo = st.date_input("Prazo *", value=prazo_val, key="form_prazo_acao")
 
-    prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
-    prazo = st.date_input("Prazo *", value=prazo_val, key="form_prazo_acao")
+como = st.text_input("Como", value=valores_padrao["como"], key="form_como_acao")
+quando_detalhe = str(st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"], key="form_quando_acao"))
 
-    como = st.text_input("Como", value=valores_padrao["como"], key="form_como_acao")
-    quando_detalhe = str(st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"], key="form_quando_acao"))
+lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
+status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0, key="form_status_acao")
 
-    lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
-    status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0, key="form_status_acao")
+arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"], key="form_file_acao")
 
-    arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"], key="form_file_acao")
-
-    # PROCESSAMENTO DOS BOTÕES DE SALVAMENTO / EDIÇÃO
-    if st.session_state['edit_item']:
-        st.warning(f"📝 Você está no modo de edição da Ação ID #{valores_padrao['id']}.")
-        col_salvar, col_cancelar = st.columns(2)
-        with col_salvar:
-            btn_atualizar = st.button("🔄 Confirmar e Salvar Alterações", use_container_width=True, type="primary", key="btn_confirmar_edit")
-        with col_cancelar:
-            btn_cancelar = st.button("❌ Cancelar Edição (Voltar ao Novo)", use_container_width=True, key="btn_cancelar_edit")
-            
-        if btn_cancelar:
-            st.session_state['edit_item'] = None
-            st.rerun()
-            
-        if btn_atualizar:
-            if not descricao:
-                st.error("O campo 'Descrição (O que)' é obrigatório.")
-            else:
-                url_doc = valores_padrao["url_arquivo"]
-                if arquivo_enviado:
-                    url_doc = fazer_upload_storage(arquivo_enviado)
-                
-                sucesso, msg = salvar_acao_no_banco(
-                    id_acao, descricao, porque, onde, responsavel_id_input, 
-                    str(prazo), como, quando_detalhe, status_selecionado, url_doc
-                )
-                if sucesso:
-                    st.success("Alterações salvas com sucesso!")
-                    st.session_state['edit_item'] = None
-                    st.rerun()
-    else:
-        if st.button("💾 Salvar Novo Cadastro", use_container_width=True, type="primary", key="btn_salvar_novo"):
-            if not descricao:
-                st.error("O campo 'Descrição (O que)' é obrigatório.")
-            else:
-                url_doc = None
-                if arquivo_enviado:
-                    url_doc = fazer_upload_storage(arquivo_enviado)
-                
-                sucesso, msg = salvar_acao_no_banco(
-                    "", descricao, porque, onde, responsavel_id_input, 
-                    str(prazo), como, quando_detalhe, status_selecionado, url_doc
-                )
-                if sucesso:
-                    st.success("Nova ação cadastrada com sucesso!")
-                    st.rerun()
-
-    # ==============================================================================
-    # LEITURA DO BANCO E FILTRAGEM (RODA APÓS CONFORMAÇÃO DOS BOTÕES)
-    # ==============================================================================
-    acoes = []
-    try:
-        supabase = get_supabase_client()
-        resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
-        acoes = resposta.data
-    except Exception as e:
-        st.error(f"Erro ao carregar dados do Supabase: {e}")
-
-    # --- BARRA LATERAL (SIDEBAR) COM FILTROS AVANÇADOS ---
-    st.sidebar.header("🔍 Filtros Avançados")
-
-    filtro_status = st.sidebar.multiselect(
-        "Filtrar por Status:", 
-        ["Não Iniciado", "Em Andamento", "Concluído"], 
-        default=["Não Iniciado", "Em Andamento", "Concluído"],
-        key="main_filtro_status_sidebar"
-    )
-
-    responsáveis_disponiveis = sorted(list(set([str(a.get('id_responsavel', '1')) for a in acoes]))) if acoes else ["Todos"]
-    filtro_resp = st.sidebar.selectbox(
-        "Filtrar por ID do Responsável:", 
-        ["Todos"] + responsáveis_disponiveis,
-        key="main_filtro_resp_sidebar"
-    )
-
-    if st.sidebar.button("🚪 Sair do Sistema (Logout)", use_container_width=True, key="main_btn_logout_sidebar"):
-        st.session_state['logado'] = False
+# PROCESSAMENTO DOS BOTÕES DE SALVAMENTO / EDIÇÃO
+if st.session_state['edit_item']:
+    st.warning(f"📝 Você está no modo de edição da Ação ID #{valores_padrao['id']}.")
+    col_salvar, col_cancelar = st.columns(2)
+    with col_salvar:
+        btn_atualizar = st.button("🔄 Confirmar e Salvar Alterações", use_container_width=True, type="primary", key="btn_confirmar_edit")
+    with col_cancelar:
+        btn_cancelar = st.button("❌ Cancelar Edição (Voltar ao Novo)", use_container_width=True, key="btn_cancelar_edit")
+        
+    if btn_cancelar:
         st.session_state['edit_item'] = None
         st.rerun()
+        
+    if btn_atualizar:
+        if not descricao:
+            st.error("O campo 'Descrição (O que)' é obrigatório.")
+        else:
+            url_doc = valores_padrao["url_arquivo"]
+            if arquivo_enviado:
+                url_doc = fazer_upload_storage(arquivo_enviado)
+            
+            sucesso, msg = salvar_acao_no_banco(
+                id_acao, descricao, porque, onde, responsavel_id_input, 
+                str(prazo), como, quando_detalhe, status_selecionado, url_doc
+            )
+            if suicidal_check := sucesso:
+                st.success("Alterações salvas com sucesso!")
+                st.session_state['edit_item'] = None
+                st.rerun()
+else:
+    if st.button("💾 Salvar Novo Cadastro", use_container_width=True, type="primary", key="btn_salvar_novo"):
+        if not descricao:
+            st.error("O campo 'Descrição (O que)' é obrigatório.")
+        else:
+            url_doc = None
+            if arquivo_enviado:
+                url_doc = fazer_upload_storage(arquivo_enviado)
+            
+            sucesso, msg = salvar_acao_no_banco(
+                "", descricao, porque, onde, responsavel_id_input, 
+                str(prazo), como, quando_detalhe, status_selecionado, url_doc
+            )
+            if sucesso:
+                st.success("Nova ação cadastrada com sucesso!")
+                st.rerun()
 
-    # Processamento dos filtros (Reescrito de forma direta e segura contra IndentationError)
-    acoes_filtradas = acoes if acoes else []
+# ==============================================================================
+# LEITURA DO BANCO E FILTRAGEM (RODA APÓS CONFORMAÇÃO DOS BOTÕES)
+# ==============================================================================
+acoes = []
+try:
+    supabase = get_supabase_client()
+    resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
+    acoes = resposta.data
+except Exception as e:
+    st.error(f"Erro ao carregar dados do Supabase: {e}")
+
+# --- BARRA LATERAL (SIDEBAR) COM FILTROS AVANÇADOS ---
+st.sidebar.header("🔍 Filtros Avançados")
+
+filtro_status = st.sidebar.multiselect(
+    "Filtrar por Status:", 
+    ["Não Iniciado", "Em Andamento", "Concluído"], 
+    default=["Não Iniciado", "Em Andamento", "Concluído"],
+    key="main_filtro_status_sidebar"
+)
+
+responsáveis_disponiveis = sorted(list(set([str(a.get('id_responsavel', '1')) for a in acoes]))) if acoes else ["Todos"]
+filtro_resp = st.sidebar.selectbox(
+    "Filtrar por ID do Responsável:", 
+    ["Todos"] + responsáveis_disponiveis,
+    key="main_filtro_resp_sidebar"
+)
+
+if st.sidebar.button("🚪 Sair do Sistema (Logout)", use_container_width=True, key="main_btn_logout_sidebar"):
+    st.session_state['logado'] = False
+    st.session_state['edit_item'] = None
+    st.rerun()
+
+# Processamento linear e seguro dos filtros (Sem blocos aninhados que geram erros de espaço)
+acoes_filtradas = acoes if acoes else []
+
+if acoes_filtradas and filtro_status:
+    status_permitidos = [s.title() for s in filtro_status]
+    acoes_filtradas = [a for a in acoes_filtradas if str(a.get('status', 'Não Iniciado')).strip().title() in status_permitidos]
     
-    if acoes_filtradas and filtro_status:
+if acoes_filtradas and filtro_resp != "Todos":
+    acoes_filtradas = [a for a in acoes_filtradas if str(a.get('id_responsavel', '1')) == filtro_resp]
+
+# --- PAINEL DE MONITORAMENTO E MÉTRICAS ---
+st.write("---")
