@@ -53,7 +53,6 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
             "url_arquivo": url_arq
         }
         
-        # CORREÇÃO DEFINITIVA: Nome da tabela limpo sem aspas internas
         if id_limpo and id_limpo.isdigit():
             supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
         else:
@@ -117,7 +116,7 @@ if st.session_state['edit_item']:
 # --- TÍTULO DO PAINEL PRINCIPAL ---
 st.title("Plano de Ação Lavo e Levo")
 
-# --- PAINEL OPERACIONAL ---
+# --- PAINEL OPERACIONAL INSERÇÃO / EDICAO NO TOPO ---
 st.write("---")
 st.subheader("📝 Painel: Registrar ou Modificar Informações")
 
@@ -185,12 +184,11 @@ else:
                 st.rerun()
 
 # ==============================================================================
-# LEITURA DO BANCO SEM ASPAS INTERNAS (CORREÇÃO PGRST205)
+# LEITURA DO BANCO E FILTRAGEM (RODA APÓS CONFORMAÇÃO DOS BOTÕES)
 # ==============================================================================
 acoes = []
 try:
     supabase = get_supabase_client()
-    # CORREÇÃO DEFINITIVA: Nome da tabela limpo conforme sugerido pelo cache
     resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
     acoes = resposta.data
 except Exception as e:
@@ -229,3 +227,6 @@ if acoes_filtradas and filtro_resp != "Todos":
     acoes_filtradas = [a for a in acoes_filtradas if str(a.get('id_responsavel', '1')) == filtro_resp]
 
 # --- PAINEL DE MONITORAMENTO E MÉTRICAS ---
+st.write("---")
+st.subheader("📊 Painel de Monitoramento Geral")
+
