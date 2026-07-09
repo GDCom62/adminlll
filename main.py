@@ -181,23 +181,18 @@ with m3:
 
 st.write("<br>", unsafe_allow_html=True)
 
-# --- GRÁFICO DE BARRAS NATIVO E SEGURO (CORRIGIDO PARA NOVA VERSÃO) ---
+# --- GRÁFICO DE BARRAS NATIVO E SEGURO (VERSÃO SIMPLIFICADA) ---
 if total_acoes > 0:
     df_barras_limpo = pd.DataFrame({
         "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
         "Quantidade": [status_contagem["Não Iniciado"], status_contagem["Em Andamento"], status_contagem["Concluído"]]
     })
     
-    st.bar_chart(
-        df_barras_limpo, 
-        x="Status", 
-        y="Quantidade", 
-        # Correção: removemos o color="Status" que causava o TypeError
-        # e aplicamos a cor de forma direta e segura
-        color_config={
-            "Quantidade": "#66b3ff"  # Define uma cor azul elegante padrão para todas as barras
-        }
-    )
+    # Define o Status como o índice para o Streamlit rotular o eixo X automaticamente
+    df_barras_limpo = df_barras_limpo.set_index("Status")
+    
+    # Comando simplificado e oficial: sem parâmetros complexos que causam TypeError
+    st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
 else:
     st.info("💡 Nenhuma ação corresponde aos filtros selecionados na barra lateral.")
 
