@@ -3,7 +3,7 @@ import pandas as pd
 import base64
 import os
 import io
-import plotly.express as px  
+import plotly.express as px  # Biblioteca nativa e estável para o gráfico
 from supabase import create_client, Client
 
 # Configuração da página Streamlit (DEVE SER A PRIMEIRA LINHA DE CÓDIGO)
@@ -15,6 +15,47 @@ SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
 def get_supabase_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# --- FUNÇÃO ISOLADA PARA GERAR O RELATÓRIO PDF ---
+def generar_pdf_atualizado(dados_acoes):
+    buffer_pdf = io.BytesIO()
+    from reportlab.lib.pagesizes import landscape, A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import colors
+    
+    doc = SimpleDocTemplate(buffer_pdf, pagesize=landscape(A4))
+    elements = []
+    styles = getSampleStyleSheet()
+    elements.append(Paragraph("PLANO DE AÇÃO ADMINISTRATIVO", styles['Title']))
+    elements.append(Spacer(1, 12))
+
+    dados_pdf = [["ID", "Ação (What)", "Prazo", "Status", "Por que", "Onde", "Como", "Quando Det."]]
+    for a in dados_acoes:
+        dados_pdf.append([
+            str(a.get('id_acao', '')), 
+            str(a.get('descricao_acao', '')), 
+            str(a.get('prazo', '')), 
+            str(a.get('status', '')), 
+            str(a.get('porque', '')), 
+            str(a.get('onde', '')), 
+            str(a.get('como', '')), 
+            str(a.get('quando_detalhe', ''))
+        ])
+
+    # Larguras numéricas em pontos definidas explicitamente para a folha deitada (Landscape)
+    t = Table(dados_pdf, colWidths=[40, 160, 70, 80, 120, 100, 120, 100])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.navy),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(t)
+    doc.build(elements)
+    buffer_pdf.seek(0)
+    return buffer_pdf.getvalue()
 
 # Inicializa os estados da sessão de forma segura no topo
 if 'logado' not in st.session_state:
@@ -61,42 +102,6 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         return True, "Operação realizada com sucesso!"
     except Exception as e:
         return False, f"Erro ao salvar no Supabase: {str(e)}"
-
-# Função Isolada para Gerar o Relatório PDF (Corrigida fora de loops)
-def gerar_pdf_atualizado(dados_acoes):
-    buffer_pdf = io.BytesIO()
-    from reportlab.lib.pagesizes import landscape, A4
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.lib import colors
-    
-    doc = SimpleDocTemplate(buffer_pdf, pagesize=landscape(A4))
-    elements = []
-    styles = getSampleStyleSheet()
-    elements.append(Paragraph("PLANO DE AÇÃO ADMINISTRATIVO", styles['Title']))
-    elements.append(Spacer(1, 12))
-
-    dados_pdf = [["ID", "Ação (What)", "Prazo", "Status", "Por que", "Onde", "Como", "Quando Det."]]
-    for a in dados_acoes:
-        dados_pdf.append([
-            str(a.get('id_acao', '')), str(a.get('descricao_acao', '')), str(a.get('prazo', '')), 
-            str(a.get('status', '')), str(a.get('porque', '')), str(a.get('onde', '')), 
-            str(a.get('como', '')), str(a.get('quando_detalhe', ''))
-        ])
-
-    # Definida as larguras em pontos proporcionais para caber em folha A4 Paisagem
-    t = Table(dados_pdf, colWidths=[40, 160, 70, 80, 120, 100, 120, 100])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.navy),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
-    elements.append(t)
-    doc.build(elements)
-    buffer_pdf.seek(0)
-    return buffer_pdf.getvalue()
 
 
 # --- TELA DE LOGIN FORMATO FORMULÁRIO (BLINDADO PARA NUVEM) ---
@@ -173,7 +178,7 @@ try:
 except Exception as e:
     st.error(f"Erro ao carregar dados do Supabase: {e}")
 
-# --- INDICADORES GRÁFICOS E METRICAS ---
+# --- INDICADORES GRÁFICOS E METRICAS TURBINADAS ---
 st.write("---")
 st.subheader("📊 Painel de Monitoramento Geral")
 
@@ -206,7 +211,7 @@ taxa_conclusao = (concluidas / total_acoes * 100) if total_acoes > 0 else 0.0
 
 m1, m2, m3 = st.columns(3)
 with m1:
-    st.metric(label="📋 Total de Ações", value=f"{total_acoes} itens")
+    st.metric(label="📋 Total de Ações Registradas", value=f"{total_acoes} itens")
 with m2:
     st.metric(label="✅ Taxa de Conclusão", value=f"{taxa_conclusao:.1f}%")
 with m3:
@@ -217,7 +222,7 @@ with m3:
 
 st.write("<br>", unsafe_allow_html=True)
 
-# Gráfico de Barras Nativo
+# Gráfico de Barras Nativo Estável
 if total_acoes > 0:
     df_barras_limpo = pd.DataFrame({
         "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
@@ -240,18 +245,11 @@ if acoes:
     df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
-    # Botão de download do PDF chamando a função corrigida
-    pdf_data = gerar_pdf_atualizado(acoes)
+    # Botão do Relatório PDF usando a função isolada lá do topo
+    pdf_data = generar_pdf_atualizado(acoes)
     st.download_button(
         label="📄 Gerar e Baixar Relatório (PDF)",
         data=pdf_data,
         file_name="Plano_Lavo_Levo.pdf",
         mime="application/pdf",
         key="btn_download_pdf_final",
-        use_container_width=True
-    )
-    
-    st.write("**Ações de Gerenciamento:**")
-    col_sel, col_btn_ed, col_btn_ex = st.columns(3)
-    
-    with col_sel:
