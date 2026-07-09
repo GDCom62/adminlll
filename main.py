@@ -29,11 +29,12 @@ def fazer_upload_storage(arquivo_upload):
             supabase = get_supabase_client()
             bytes_data = arquivo_upload.getvalue()
             nome_arquivo = f"{pd.Timestamp.now().strftime('%Y%m%d%H%M%S')}_{arquivo_upload.name}"
+            # Envia o arquivo para o bucket
             supabase.storage.from_("arquivos_acoes").upload(nome_arquivo, bytes_data)
             url_publica = supabase.storage.from_("arquivos_acoes").get_public_url(nome_arquivo)
             return url_publica
         except Exception as e:
-            st.error(f"Erro ao subir arquivo: {e}")
+            st.error(f"Erro ao subir arquivo no Storage: {e}")
             return None
     return None
 
@@ -92,39 +93,6 @@ if not st.session_state['logado']:
 # SISTEMA PRINCIPAL (SÓ CARREGA SE LOGADO)
 # ==============================================================================
 else:
-    # Buscar dados brutos do banco Supabase de forma protegida para alimentar filtros e tabelas
-    acoes = []
-    try:
-        supabase = get_supabase_client()
-        resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
-        acoes = resposta.data
-    except Exception as e:
-        st.error(f"Erro ao carregar dados do Supabase: {e}")
-
-    # --- BARRA LATERAL (SIDEBAR) COM FILTROS AVANÇADOS ---
-    st.sidebar.header("🔍 Filtros Avançados")
-
-    filtro_status = st.sidebar.multiselect(
-        "Filtrar por Status:", 
-        ["Não Iniciado", "Em Andamento", "Concluído"], 
-        default=["Não Iniciado", "Em Andamento", "Concluído"],
-        key="main_filtro_status_sidebar"
-    )
-
-    responsáveis_disponiveis = sorted(list(set([str(a.get('id_responsavel', '1')) for a in acoes]))) if acoes else ["Todos"]
-    filtro_resp = st.sidebar.selectbox(
-        "Filtrar por ID do Responsável:", 
-        ["Todos"] + responsáveis_disponiveis,
-        key="main_filtro_resp_sidebar"
-    )
-
-    # Botão de Logout na lateral
-    st.sidebar.write("---")
-    if st.sidebar.button("🚪 Sair do Sistema (Logout)", use_container_width=True, key="main_btn_logout_sidebar"):
-        st.session_state['logado'] = False
-        st.session_state['edit_item'] = None
-        st.rerun()
-
     # --- CONFIGURAÇÃO DE VALORES PADRÃO (MODO EDIÇÃO) ---
     valores_padrao = {
         "id": "", "descricao": "", "porque": "", "onde": "", 
@@ -149,7 +117,7 @@ else:
     # --- TÍTULO DO PAINEL PRINCIPAL ---
     st.title("Plano de Ação Lavo e Levo")
 
-    # --- PAINEL OPERACIONAL NO TOPO DO CODIGO ---
+    # --- PAINEL OPERACIONAL NO TOPO ---
     st.write("---")
     st.subheader("📝 Painel: Registrar ou Modificar Informações")
 
@@ -190,6 +158,7 @@ else:
                 url_doc = valores_padrao["url_arquivo"]
                 if arquivo_enviado:
                     url_doc = fazer_upload_storage(arquivo_enviado)
+                
                 sucesso, msg = salvar_acao_no_banco(
                     id_acao, descricao, porque, onde, responsavel_id_input, 
                     str(prazo), como, quando_detalhe, status_selecionado, url_doc
@@ -206,6 +175,7 @@ else:
                 url_doc = None
                 if arquivo_enviado:
                     url_doc = fazer_upload_storage(arquivo_enviado)
+                
                 sucesso, msg = salvar_acao_no_banco(
                     "", descricao, porque, onde, responsavel_id_input, 
                     str(prazo), como, quando_detalhe, status_selecionado, url_doc
@@ -214,9 +184,40 @@ else:
                     st.success("Nova ação cadastrada com sucesso!")
                     st.rerun()
 
-    # --- FILTRAGEM DE DADOS SEGURA ---
+    # ==============================================================================
+    # LEITURA DO BANCO E FILTRAGEM (RODA APÓS CONFORMAÇÃO DOS BOTÕES)
+    # ==============================================================================
+    acoes = []
+    try:
+        supabase = get_supabase_client()
+        resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
+        acoes = resposta.data
+    except Exception as e:
+        st.error(f"Erro ao carregar dados do Supabase: {e}")
+
+    # --- BARRA LATERAL (SIDEBAR) COM FILTROS AVANÇADOS ---
+    st.sidebar.header("🔍 Filtros Avançados")
+
+    filtro_status = st.sidebar.multiselect(
+        "Filtrar por Status:", 
+        ["Não Iniciado", "Em Andamento", "Concluído"], 
+        default=["Não Iniciado", "Em Andamento", "Concluído"],
+        key="main_filtro_status_sidebar"
+    )
+
+    responsáveis_disponiveis = sorted(list(set([str(a.get('id_responsavel', '1')) for a in acoes]))) if acoes else ["Todos"]
+    filtro_resp = st.sidebar.selectbox(
+        "Filtrar por ID do Responsável:", 
+        ["Todos"] + responsáveis_disponiveis,
+        key="main_filtro_resp_sidebar"
+    )
+
+    if st.sidebar.button("🚪 Sair do Sistema (Logout)", use_container_width=True, key="main_btn_logout_sidebar"):
+        st.session_state['logado'] = False
+        st.session_state['edit_item'] = None
+        st.rerun()
+
+    # Processamento seguro dos filtros selecionados
     acoes_filtradas = []
     if acoes:
         for a in acoes:
-            status_limpo = str(a.get('status', 'Não Iniciado')).strip().title()
-            status_permitidos = [s.title() for s in filtro_status] if filtro_status else []
