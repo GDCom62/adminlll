@@ -53,11 +53,11 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
             "url_arquivo": url_arq
         }
         
-        # Corrigido: Uso de aspas duplas internas para respeitar a letra maiúscula no PostgreSQL
+        # CORREÇÃO DEFINITIVA: Nome da tabela limpo sem aspas internas
         if id_limpo and id_limpo.isdigit():
-            supabase.table('"Acoes"').update(dados_acao).eq("id_acao", int(id_limpo)).execute()
+            supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
         else:
-            supabase.table('"Acoes"').insert(dados_acao).execute()
+            supabase.table("Acoes").insert(dados_acao).execute()
             
         return True, "Operação realizada com sucesso!"
     except Exception as e:
@@ -185,13 +185,13 @@ else:
                 st.rerun()
 
 # ==============================================================================
-# LEITURA DO BANCO COM ASPAS DE SEGURANÇA NO POSTGRESQL
+# LEITURA DO BANCO SEM ASPAS INTERNAS (CORREÇÃO PGRST205)
 # ==============================================================================
 acoes = []
 try:
     supabase = get_supabase_client()
-    # Corrigido: Adicionado '"Acoes"' para trazer as linhas cadastradas
-    resposta = supabase.table('"Acoes"').select("*").order("prazo", desc=False).execute()
+    # CORREÇÃO DEFINITIVA: Nome da tabela limpo conforme sugerido pelo cache
+    resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
     acoes = resposta.data
 except Exception as e:
     st.error(f"Erro ao carregar dados do Supabase: {e}")
@@ -228,3 +228,4 @@ if acoes_filtradas and filtro_status:
 if acoes_filtradas and filtro_resp != "Todos":
     acoes_filtradas = [a for a in acoes_filtradas if str(a.get('id_responsavel', '1')) == filtro_resp]
 
+# --- PAINEL DE MONITORAMENTO E MÉTRICAS ---
