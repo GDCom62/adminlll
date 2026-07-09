@@ -181,7 +181,7 @@ with m3:
 
 st.write("<br>", unsafe_allow_html=True)
 
-# --- GRÁFICO DE BARRAS NATIVO E SEGURO ---
+# --- GRÁFICO DE BARRAS NATIVO E SEGURO (CORRIGIDO PARA NOVA VERSÃO) ---
 if total_acoes > 0:
     df_barras_limpo = pd.DataFrame({
         "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
@@ -192,11 +192,10 @@ if total_acoes > 0:
         df_barras_limpo, 
         x="Status", 
         y="Quantidade", 
-        color="Status",
+        # Correção: removemos o color="Status" que causava o TypeError
+        # e aplicamos a cor de forma direta e segura
         color_config={
-            "Não Iniciado": "#ff9999",
-            "Em Andamento": "#66b3ff",
-            "Concluído": "#99ff99"
+            "Quantidade": "#66b3ff"  # Define uma cor azul elegante padrão para todas as barras
         }
     )
 else:
