@@ -216,7 +216,7 @@ else:
         st.session_state['edit_item'] = None
         st.rerun()
 
-    # Processamento seguro e perfeitamente indentado dos filtros selecionados
-    acoes_filtradas = []
-    if acoes:
-        for a in acoes:
+    # Processamento dos filtros (Reescrito de forma direta e segura contra IndentationError)
+    acoes_filtradas = acoes if acoes else []
+    
+    if acoes_filtradas and filtro_status:
