@@ -89,7 +89,7 @@ if not st.session_state['logado']:
     st.stop()
 
 # ==============================================================================
-# SISTEMA PRINCIPAL (SÓ CARREGA SE LOGADO) - ESTRUTURA SEM BLOCO ELSE PAI
+# SISTEMA PRINCIPAL (SÓ CARREGA SE LOGADO)
 # ==============================================================================
 
 # --- CONFIGURAÇÃO DE VALORES PADRÃO (MODO EDIÇÃO) ---
@@ -116,7 +116,7 @@ if st.session_state['edit_item']:
 # --- TÍTULO DO PAINEL PRINCIPAL ---
 st.title("Plano de Ação Lavo e Levo")
 
-# --- PAINEL OPERACIONAL NO TOPO ---
+# --- PAINEL OPERACIONAL ---
 st.write("---")
 st.subheader("📝 Painel: Registrar ou Modificar Informações")
 
@@ -162,7 +162,7 @@ if st.session_state['edit_item']:
                 id_acao, descricao, porque, onde, responsavel_id_input, 
                 str(prazo), como, quando_detalhe, status_selecionado, url_doc
             )
-            if suicidal_check := sucesso:
+            if sucesso:
                 st.success("Alterações salvas com sucesso!")
                 st.session_state['edit_item'] = None
                 st.rerun()
@@ -177,14 +177,14 @@ else:
             
             sucesso, msg = salvar_acao_no_banco(
                 "", descricao, porque, onde, responsavel_id_input, 
-                str(prazo), como, quando_detalhe, status_selecionado, url_doc
+                str(prazo), como, when_detalhe=quando_detalhe, status=status_selecionado, url_arq=url_doc
             )
             if sucesso:
                 st.success("Nova ação cadastrada com sucesso!")
                 st.rerun()
 
 # ==============================================================================
-# LEITURA DO BANCO E FILTRAGEM (RODA APÓS CONFORMAÇÃO DOS BOTÕES)
+# LEITURA DO BANCO E FILTRAGEM (RODA EM SEQUÊNCIA DIRETA)
 # ==============================================================================
 acoes = []
 try:
@@ -216,7 +216,7 @@ if st.sidebar.button("🚪 Sair do Sistema (Logout)", use_container_width=True, 
     st.session_state['edit_item'] = None
     st.rerun()
 
-# Processamento linear e seguro dos filtros (Sem blocos aninhados que geram erros de espaço)
+# Processamento dos filtros linear sem quebras
 acoes_filtradas = acoes if acoes else []
 
 if acoes_filtradas and filtro_status:
@@ -228,3 +228,5 @@ if acoes_filtradas and filtro_resp != "Todos":
 
 # --- PAINEL DE MONITORAMENTO E MÉTRICAS ---
 st.write("---")
+st.subheader("📊 Painel de Monitoramento Geral")
+
