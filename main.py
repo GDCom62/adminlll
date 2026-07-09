@@ -9,9 +9,9 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Lembre-se de manter as suas credenciais reais aqui!
-SUPABASE_URL = "https://supabase.co" 
-SUPABASE_KEY = "sua-chave-anonima-longa-real-aqui"
+# Lembre-se de preencher com a URL e KEY corretas do seu projeto
+SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
+SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
 def get_supabase_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -242,7 +242,81 @@ if acoes_filtradas:
         file_name="Plano_de_Acao_Lavo_Levo.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+        # df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
+    st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
+    # --- ÁREA DE EXPORTAÇÃO E DOWNLOADS ---
+    col_down1, col_down2 = st.columns(2)
+    
+    with col_down1:
+        # 1. Relatório em Excel (openpyxl)
+        buffer_excel = io.BytesIO()
+        with pd.ExcelWriter(buffer_excel, engine='openpyxl') as writer:
+            df_tabela.to_excel(writer, index=False, sheet_name='Plano de Ação')
+        
+        st.download_button(
+            label="📥 Baixar Relatório Filtrado (Excel)",
+            data=buffer_excel.getvalue(),
+            file_name="Plano_de_Acao_Lavo_Levo.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+        
+    with col_down2:
+        # 2. Relatório em PDF (ReportLab) Reativado
+        # Criamos uma função rápida interna para reconstruir o PDF com base nos filtros atuais
+        def gerar_pdf_atualizado(dados_acoes):
+            buffer_pdf = io.BytesIO()
+            from reportlab.lib.pagesizes import landscape, A4
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.lib import colors
+            
+            doc = SimpleDocTemplate(buffer_pdf, pagesize=landscape(A4))
+            elements = []
+            styles = getSampleStyleSheet()
+            elements.append(Paragraph("PLANO DE AÇÃO ADMINISTRATIVO - LAVO E LEVO", styles['Title']))
+            elements.append(Spacer(1, 12))
+
+            # Cabeçalho estruturado do PDF
+            dados_pdf = [["ID", "Ação (What)", "Prazo", "Status", "Por que", "Onde", "Como", "Quando Det."]]
+            for a in dados_acoes:
+                dados_pdf.append([
+                    str(a.get('id_acao', '')), 
+                    str(a.get('descricao_acao', '')), 
+                    str(a.get('prazo', '')), 
+                    str(a.get('status', '')), 
+                    str(a.get('porque', '')), 
+                    str(a.get('onde', '')), 
+                    str(a.get('como', '')), 
+                    str(a.get('quando_detalhe', ''))
+                ])
+
+            # Configura larguras das colunas para caber na folha A4 em paisagem
+            t = Table(dados_pdf, colWidths=[40, 160, 70, 80, 120, 100, 120, 100])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.navy),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                ('FONTSIZE', (0,0), (-1,-1), 8),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ]))
+            elements.append(t)
+            doc.build(elements)
+            buffer_pdf.seek(0)
+            return buffer_pdf.getvalue()
+
+        # Renderiza o botão de download de PDF se houver registros
+        pdf_data = gerar_pdf_atualizado(acoes_filtradas)
+        st.download_button(
+            label="📄 Gerar e Baixar Relatório (PDF)",
+            data=pdf_data,
+            file_name="Plano_Lavo_Levo.pdf",
+            mime="application/pdf",
+            key="btn_download_pdf_final",
+            use_container_width=True
+        )
+
     # Botões de Manutenção
     st.write("**Ações de Gerenciamento:**")
     col_sel, col_btn_ed, col_btn_ex = st.columns(3)
