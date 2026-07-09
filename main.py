@@ -9,9 +9,9 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação Lavo e Levo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Lembre-se de preencher com a URL e KEY corretas do seu projeto
-SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
-SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
+# IMPORTANTE: Coloque aqui a sua URL e KEY corretas retiradas de Settings > API
+SUPABASE_URL = "https://supabase.co" 
+SUPABASE_KEY = "sua-chave-anonima-longa-real-aqui"
 
 def get_supabase_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -116,7 +116,7 @@ if st.session_state['edit_item']:
 # --- TÍTULO DO PAINEL PRINCIPAL ---
 st.title("Plano de Ação Lavo e Levo")
 
-# --- PAINEL OPERACIONAL ---
+# --- PAINEL OPERACIONAL INSERÇÃO / EDICAO NO TOPO ---
 st.write("---")
 st.subheader("📝 Painel: Registrar ou Modificar Informações")
 
@@ -184,7 +184,7 @@ else:
                 st.rerun()
 
 # ==============================================================================
-# LEITURA DO BANCO E FILTRAGEM (RODA EM SEQUÊNCIA DIRETA)
+# LEITURA DO BANCO E FILTRAGEM (RODA APÓS CONFORMAÇÃO DOS BOTÕES)
 # ==============================================================================
 acoes = []
 try:
