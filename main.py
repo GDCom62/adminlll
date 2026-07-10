@@ -44,7 +44,7 @@ def gerar_pdf_atualizado(dados_acoes):
         ])
 
     # Larguras das 8 colunas definidas em pontos
-    t = Table(dados_pdf, colWidths=[40, 150, 65, 75, 100, 80, 100, 100])
+    t = Table(dados_pdf, colWidths=[30, 160, 65, 75, 95, 80, 130, 85])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -245,11 +245,11 @@ if acoes:
     df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
-    # --- ESTILIZAÇÃO DO BOTÃO DE PDF COMPLETA E CORRIGIDA ---
-    st.markdown("""
-        <style>
-            div[data-testid="stDownloadButton"] button {
-                background-color: #FF6F00 !important; /* Cor Abóbora */
-                color: white !important;
-                border: none !important;
-            }
+    # --- CORREÇÃO DEFINITIVA DAS ASPAS DO BOTÃO DE PDF (COR ABÓBORA) ---
+    estilo_css_abobora = """
+    <style>
+        div[data-testid="stDownloadButton"] button {
+            background-color: #FF6F00 !important;
+            color: white !important;
+            border: none !important;
+        }
