@@ -43,8 +43,8 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    # CORREÇÃO CRÍTICA DEFINITIVA: Larguras das 8 colunas especificadas em pontos para fechar a função
-    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 100, 100])
+    # CORREÇÃO CRÍTICA DO PARÊNTESE: Larguras das 8 colunas definidas em pontos [fechando os colchetes]
+    t = Table(dados_pdf, colWidths=[30, 150, 70, 80, 100, 80, 100, 120])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -245,7 +245,7 @@ if acoes:
     df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
-    # Gerador de Relatório PDF Integrado (Agora compilando sem travas)
+    # Gerador de Relatório PDF Integrado (Agora sem erros de sintaxe)
     pdf_data = gerar_pdf_atualizado(acoes)
     st.download_button(
         label="📄 Gerar e Baixar Relatório (PDF)",
