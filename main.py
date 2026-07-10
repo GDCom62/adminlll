@@ -247,7 +247,7 @@ if acoes:
     
     # Gerador de Relatório PDF Integrado (Agora sem erros de sintaxe)
     pdf_data = gerar_pdf_atualizado(acoes)
-    st.download_button(
+    st.download_button
         label="📄 Gerar e Baixar Relatório (PDF)",
         data=pdf_data,
         file_name="Plano_Lavo_Levo.pdf",
