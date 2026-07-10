@@ -247,7 +247,7 @@ if acoes:
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
     # --- ESTILIZAÇÃO DO BOTÃO DE PDF (COR ABÓBORA / LARANJA) ---
-    st.markdown("""
+    st.markdown(""")
         <style>
             div[data-testid="stDownloadButton"] button {
                 background-color: #FF6F00 !important; /* Cor Abóbora Escuro */
