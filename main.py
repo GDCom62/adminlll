@@ -10,8 +10,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Lembre-se de preencher com a URL e KEY corretas do seu projeto
-SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
+SUPABASE_URL = "https://supabase.co" 
 SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
 def get_supabase_client() -> Client:
@@ -44,8 +43,8 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    # CORREÇÃO CRÍTICA DO PARÊNTESE: Larguras das 8 colunas definidas em pontos [fechando os colchetes]
-    t = Table(dados_pdf, colWidths=[30, 150, 70, 80, 100, 80, 100, 120])
+    # Larguras das 8 colunas definidas em pontos
+    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 100, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -155,13 +154,14 @@ if st.session_state['edit_item']:
         "url_arquivo": item.get('url_arquivo')
     }
 
-# --- PAINEL PRINCIPAL ---
+# --- PAINEL PRINCIPAL COM BOTÃO DE SAIR NO TOPO DIREITO ---
 col_tit, col_log = st.columns(2)
 with col_tit:
     st.title("Plano de Ação-Administrativo")
 with col_log:
     st.write("<br>", unsafe_allow_html=True)
-    if st.button("Sair (Logout)", use_container_width=True, key="btn_logout_final"):
+    # BOTÃO DE SAIR EM DESTAQUE VERMELHO NO TOPO DIREITO
+    if st.button("🚪 Sair (Logout)", use_container_width=True, key="btn_logout_final", type="secondary"):
         st.session_state['logado'] = False
         st.session_state['edit_item'] = None
         st.rerun()
@@ -246,37 +246,8 @@ if acoes:
     df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
-      # Gerador de Relatório PDF Integrado
-    pdf_data = gerar_pdf_atualizado(acoes)
-    st.download_button(
-        label="📄 Gerar e Baixar Relatório (PDF)",
-        data=pdf_data,
-        file_name="Plano_Lavo_Levo.pdf",
-        mime="application/pdf",
-        key="btn_download_pdf_final",
-        use_container_width=True
-    )
-    
-    st.write("**Ações de Gerenciamento:**")
-    col_sel, col_btn_ed, col_btn_ex = st.columns(3)
-    
-    with col_sel:
-        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_manutencao")
-        
-    with col_btn_ed:
-        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_trigger_editar"):
-            item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
-            if item_procurado:
-                st.session_state['edit_item'] = item_procurado
-                st.rerun() 
-                
-    with col_btn_ex:
-        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_trigger_excluir"):
-            try:
-                supabase = get_supabase_client()
-                supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
-                st.success(f"Ação ID #{id_selecionado} excluída!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao excluir: {e}")
-
+    # --- ESTILIZAÇÃO DO BOTÃO DE PDF (COR ABÓBORA / LARANJA) ---
+    st.markdown("""
+        <style>
+            div[data-testid="stDownloadButton"] button {
+                background-color: #FF6F00 !important; /* Cor Abóbora Escuro */
