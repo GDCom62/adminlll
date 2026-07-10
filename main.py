@@ -44,7 +44,7 @@ def gerar_pdf_atualizado(dados_acoes):
         ])
 
     # Larguras das 8 colunas definidas em pontos
-    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 100, 100])
+    t = Table(dados_pdf, colWidths=[40, 150, 65, 75, 100, 80, 100, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -160,7 +160,6 @@ with col_tit:
     st.title("Plano de Ação-Administrativo")
 with col_log:
     st.write("<br>", unsafe_allow_html=True)
-    # BOTÃO DE SAIR EM DESTAQUE VERMELHO NO TOPO DIREITO
     if st.button("🚪 Sair (Logout)", use_container_width=True, key="btn_logout_final", type="secondary"):
         st.session_state['logado'] = False
         st.session_state['edit_item'] = None
@@ -246,8 +245,11 @@ if acoes:
     df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
-    # --- ESTILIZAÇÃO DO BOTÃO DE PDF (COR ABÓBORA / LARANJA) ---
-    st.markdown(""")
+    # --- ESTILIZAÇÃO DO BOTÃO DE PDF COMPLETA E CORRIGIDA ---
+    st.markdown("""
         <style>
             div[data-testid="stDownloadButton"] button {
-                background-color: #FF6F00 !important; /* Cor Abóbora Escuro */
+                background-color: #FF6F00 !important; /* Cor Abóbora */
+                color: white !important;
+                border: none !important;
+            }
