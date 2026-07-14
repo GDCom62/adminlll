@@ -45,7 +45,7 @@ def gerar_pdf_atualizado(dados_acoes):
         ])
 
     # Larguras das 8 colunas definidas em pontos
-    t = Table(dados_pdf, colWidths=[40, 150, 70, 70, 100, 80, 150, 80])
+    t = Table(dados_pdf, colWidths=[40, 150, 70, 70, 100, 80, 120, 90])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -246,4 +246,6 @@ if acoes:
     df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
-    # --- CORREÇÃO DO CSS: Injetado em linha única sem aspas triplas para banir o SyntaxError ---
+    # Injeção de CSS em linha única para o botão de PDF Cor Abóbora
+    st.html("<style>div[data-testid='stDownloadButton'] button {background-color: #FF6F00 !important; color: white !important; border: none !important;} div[data-testid='stDownloadButton'] button:hover {background-color: #E65100 !important; color: white !important;}</style>")
+
