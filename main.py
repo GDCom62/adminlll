@@ -3,7 +3,7 @@ import pandas as pd
 import base64
 import os
 import io
-import plotly.express as px  # Biblioteca nativa e estável para o gráfico
+import plotly.express as px  
 from supabase import create_client, Client
 
 # Configuração da página Streamlit (DEVE SER A PRIMEIRA LINHA DE CÓDIGO)
@@ -44,8 +44,7 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    # Larguras das 8 colunas definidas em pontos
-    t = Table(dados_pdf, colWidths=[40, 150, 70, 70, 100, 80, 120, 90])
+    t = Table(dados_pdf, colWidths=[30, 150, 60, 80, 100, 80, 100, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -105,7 +104,7 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         return False, f"Erro ao salvar no Supabase: {str(e)}"
 
 
-# --- TELA DE LOGIN FORMATO FORMULÁRIO (BLINDADO PARA NUVEM) ---
+# --- TELA DE LOGIN (ESTRUTURA LINEAR SEM FORM/STOP - EVITA TRAVAMENTO DE COMPONENTES) ---
 if not st.session_state['logado']:
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
@@ -115,137 +114,130 @@ if not st.session_state['logado']:
             st.caption("📷 *[Insira o arquivo logo.png no seu GitHub]*")
             
         st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
+        usuario_input = st.text_input("Usuário", key="login_username_direct")
+        senha_input = st.text_input("Senha", type="password", key="login_password_direct")
         
-        with st.form(key="formulario_login"):
-            usuario_input = st.text_input("Usuário")
-            senha_input = st.text_input("Senha", type="password")
-            botao_enviar = st.form_submit_button("Entrar", use_container_width=True)
-            
-            if botao_enviar:
-                if usuario_input.strip() == "admin" and senha_input.strip() == "123":
-                    st.session_state['logado'] = True
-                    st.success("Acesso concedido!")
-                    st.rerun()
-                else:
-                    st.error("Usuário ou senha incorretos.")
-    st.stop()
+        if st.button("Entrar", use_container_width=True, key="btn_login_direct"):
+            if usuario_input.strip() == "admin" and senha_input.strip() == "123":
+                st.session_state['logado'] = True
+                st.rerun()
+            else:
+                st.error("Usuário ou senha incorretos.")
 
 # ==============================================================================
-# SISTEMA PRINCIPAL (SÓ CARREGA SE LOGADO)
+# SISTEMA PRINCIPAL (SÓ CARREGA SE ESTIVER MUTADO COMO LOGADO)
 # ==============================================================================
-
-# --- CONFIGURAÇÃO DE VALORES PADRÃO ---
-valores_padrao = {
-    "id": "", "descricao": "", "porque": "", "onde": "", 
-    "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
-}
-
-if st.session_state['edit_item']:
-    item = st.session_state['edit_item']
+else:
+    # --- CONFIGURAÇÃO DE VALORES PADRÃO ---
     valores_padrao = {
-        "id": str(item['id_acao']),
-        "descricao": str(item['descricao_acao']),
-        "porque": str(item['porque']) if item['porque'] else "",
-        "onde": str(item['onde']) if item['onde'] else "",
-        "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
-        "como": str(item['como']) if item['como'] else "",
-        "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
-        "status": str(item['status']),
-        "prazo": item['prazo'],
-        "url_arquivo": item.get('url_arquivo')
+        "id": "", "descricao": "", "porque": "", "onde": "", 
+        "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
     }
 
-# --- PAINEL PRINCIPAL COM BOTÃO DE SAIR NO TOPO DIREITO ---
-col_tit, col_log = st.columns(2)
-with col_tit:
-    st.title("Plano de Ação-Administrativo")
-with col_log:
-    st.write("<br>", unsafe_allow_html=True)
-    if st.button("🚪 Sair (Logout)", use_container_width=True, key="btn_logout_final", type="secondary"):
-        st.session_state['logado'] = False
-        st.session_state['edit_item'] = None
-        st.rerun()
+    if st.session_state['edit_item']:
+        item = st.session_state['edit_item']
+        valores_padrao = {
+            "id": str(item['id_acao']),
+            "descricao": str(item['descricao_acao']),
+            "porque": str(item['porque']) if item['porque'] else "",
+            "onde": str(item['onde']) if item['onde'] else "",
+            "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
+            "como": str(item['como']) if item['como'] else "",
+            "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
+            "status": str(item['status']),
+            "prazo": item['prazo'],
+            "url_arquivo": item.get('url_arquivo')
+        }
 
-# Buscar dados do banco Supabase de forma protegida
-acoes = []
-try:
-    supabase = get_supabase_client()
-    resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
-    
-    if hasattr(resposta, "data"):
-        acoes = resposta.data
-    elif isinstance(resposta, dict) and "data" in resposta:
-        acoes = resposta["data"]
-except Exception as e:
-    st.error(f"Erro ao carregar dados do Supabase: {e}")
+    # --- PAINEL PRINCIPAL COM BOTÃO DE SAIR NO TOPO DIREITO ---
+    col_tit, col_log = st.columns(2)
+    with col_tit:
+        st.title("Plano de Ação-Administrativo")
+    with col_log:
+        st.write("<br>", unsafe_allow_html=True)
+        if st.button("🚪 Sair (Logout)", use_container_width=True, key="btn_logout_final", type="secondary"):
+            st.session_state['logado'] = False
+            st.session_state['edit_item'] = None
+            st.rerun()
 
-# --- INDICADORES GRÁFICOS E METRICAS TURBINADAS ---
-st.write("---")
-st.subheader("📊 Painel de Monitoramento Geral")
-
-total_acoes = len(acoes)
-concluidas = 0
-atrasadas = 0
-hoje = pd.Timestamp.now().date()
-status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
-
-if acoes:
-    for a in acoes:
-        status_texto = str(a.get('status', 'Não Iniciado')).strip().title()
+    # Buscar dados do banco Supabase de forma protegida
+    acoes = []
+    try:
+        supabase = get_supabase_client()
+        resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
         
-        if "Andamento" in status_texto:
-            status_contagem["Em Andamento"] += 1
-        elif "Concluido" in status_texto or "Concluído" in status_texto:
-            status_contagem["Concluído"] += 1
-            concluidas += 1
+        if hasattr(resposta, "data"):
+            acoes = resposta.data
+        elif isinstance(resposta, dict) and "data" in resposta:
+            acoes = resposta["data"]
+    except Exception as e:
+        st.error(f"Erro ao carregar dados do Supabase: {e}")
+
+    # --- INDICADORES GRÁFICOS E METRICAS TURBINADAS ---
+    st.write("---")
+    st.subheader("📊 Painel de Monitoramento Geral")
+
+    total_acoes = len(acoes)
+    concluidas = 0
+    atrasadas = 0
+    hoje = pd.Timestamp.now().date()
+    status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
+
+    if acoes:
+        for a in acoes:
+            status_texto = str(a.get('status', 'Não Iniciado')).strip().title()
+            
+            if "Andamento" in status_texto:
+                status_contagem["Em Andamento"] += 1
+            elif "Concluido" in status_texto or "Concluído" in status_texto:
+                status_contagem["Concluído"] += 1
+                concluidas += 1
+            else:
+                status_contagem["Não Iniciado"] += 1
+                
+            try:
+                data_prazo = pd.to_datetime(a.get('prazo')).date()
+                if data_prazo < hoje and "Concluid" not in status_texto:
+                    atrasadas += 1
+            except:
+                pass
+
+    taxa_conclusao = (concluidas / total_acoes * 100) if total_acoes > 0 else 0.0
+
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric(label="📋 Total de Ações Registradas", value=f"{total_acoes} itens")
+    with m2:
+        st.metric(label="✅ Taxa de Conclusão", value=f"{taxa_conclusao:.1f}%")
+    with m3:
+        if atrasadas > 0:
+            st.metric(label="🚨 Ações Críticas (Atrasadas)", value=f"{atrasadas} pendentes", delta="- Atenção urgente", delta_color="inverse")
         else:
-            status_contagem["Não Iniciado"] += 1
-            
-        try:
-            data_prazo = pd.to_datetime(a.get('prazo')).date()
-            if data_prazo < hoje and "Concluid" not in status_texto:
-                atrasadas += 1
-        except:
-            pass
+            st.metric(label="🛡️ Prazos sob Controle", value="0 atrasos", delta="Em dia")
 
-taxa_conclusao = (concluidas / total_acoes * 100) if total_acoes > 0 else 0.0
+    st.write("<br>", unsafe_allow_html=True)
 
-m1, m2, m3 = st.columns(3)
-with m1:
-    st.metric(label="📋 Total de Ações Registradas", value=f"{total_acoes} itens")
-with m2:
-    st.metric(label="✅ Taxa de Conclusão", value=f"{taxa_conclusao:.1f}%")
-with m3:
-    if atrasadas > 0:
-        st.metric(label="🚨 Ações Críticas (Atrasadas)", value=f"{atrasadas} pendentes", delta="- Atenção urgente", delta_color="inverse")
-    else:
-        st.metric(label="🛡️ Prazos sob Controle", value="0 atrasos", delta="Em dia")
+    # Gráfico de Barras Nativo Estável
+    if total_acoes > 0:
+        df_barras_limpo = pd.DataFrame({
+            "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
+            "Quantidade": [status_contagem["Não Iniciado"], status_contagem["Em Andamento"], status_contagem["Concluído"]]
+        }).set_index("Status")
+        st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
 
-st.write("<br>", unsafe_allow_html=True)
+    # --- LISTAGEM DOS ITENS SALVOS ---
+    st.write("---")
+    st.subheader("📋 Ações Registradas")
 
-# Gráfico de Barras Nativo Estável
-if total_acoes > 0:
-    df_barras_limpo = pd.DataFrame({
-        "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
-        "Quantidade": [status_contagem["Não Iniciado"], status_contagem["Em Andamento"], status_contagem["Concluído"]]
-    }).set_index("Status")
-    st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
-
-# --- LISTAGEM DOS ITENS SALVOS ---
-st.write("---")
-st.subheader("📋 Ações Registradas")
-
-if acoes:
-    df_tabela = pd.DataFrame(acoes)
-    colunas_necessarias = ["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]
-    for col in colunas_necessarias:
-        if col not in df_tabela.columns:
-            df_tabela[col] = ""
-            
-    df_tabela = df_tabela[colunas_necessarias]
-    df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
-    st.dataframe(df_tabela, use_container_width=True, hide_index=True)
-    
-    # Injeção de CSS em linha única para o botão de PDF Cor Abóbora
-    st.html("<style>div[data-testid='stDownloadButton'] button {background-color: #FF6F00 !important; color: white !important; border: none !important;} div[data-testid='stDownloadButton'] button:hover {background-color: #E65100 !important; color: white !important;}</style>")
-
+    if acoes:
+        df_tabela = pd.DataFrame(acoes)
+        colunas_necessarias = ["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]
+        for col in colunas_necessarias:
+            if col not in df_tabela.columns:
+                df_tabela[col] = ""
+                
+        df_tabela = df_tabela[colunas_necessarias]
+        df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
+        st.dataframe(df_tabela, use_container_width=True, hide_index=True)
+        
+        # Injeção de CSS em linha única para o botão de PDF Cor Abóbora
