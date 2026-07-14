@@ -44,7 +44,7 @@ def gerar_pdf_atualizado(dados_acoes):
         ])
 
     # Larguras das 8 colunas definidas em pontos
-    t = Table(dados_pdf, colWidths=[30, 160, 60, 70, 100, 70, 110, 120])
+    t = Table(dados_pdf, colWidths=[40, 150, 70, 70, 100, 80, 150, 80])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -141,7 +141,6 @@ valores_padrao = {
 
 if st.session_state['edit_item']:
     item = st.session_state['edit_item']
-    # CORREÇÃO CRÍTICA DE MAPEAMENTO: mudado de item['id'] para item['id_acao']
     valores_padrao = {
         "id": str(item['id_acao']),
         "descricao": str(item['descricao_acao']),
@@ -246,9 +245,4 @@ if acoes:
     df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
-    # --- ESTILIZAÇÃO DO BOTÃO DE PDF ---
-    st.markdown("""
-        <style>
-            div[data-testid="stDownloadButton"] button {
-                background-color: #FF6F00 !important;
-                color: white !important;
+    # --- CORREÇÃO DO CSS: Injetado em linha única sem aspas triplas para banir o SyntaxError ---
