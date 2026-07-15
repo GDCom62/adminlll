@@ -9,8 +9,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Lembre-se de preencher com a URL e KEY corretas do seu projeto
-SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
+SUPABASE_URL = "https://supabase.co" 
 SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
 def get_supabase_client() -> Client:
@@ -43,7 +42,7 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    t = Table(dados_pdf, colWidths=[30, 130, 60, 70, 100, 80, 100, 100])
+    t = Table(dados_pdf, colWidths=[30, 130, 60, 70, 90, 80, 130, 130])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -101,12 +100,11 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         return False, f"Erro ao salvar no Supabase: {str(e)}"
 
 
-# --- TELA DE LOGIN BLINDADA (ESTÁTICA DIRETA SEM DEPENDER DE CLIQUE OU REFRESH) ---
+# --- TELA DE LOGIN BLINDADA PARA NUVEM ---
 st.sidebar.markdown("<h2 style='text-align: center;'>🔐 Controle de Acesso</h2>", unsafe_allow_html=True)
 usuario_input = st.sidebar.text_input("Usuário", key="login_username_final_proof")
 senha_input = st.sidebar.text_input("Senha", type="password", key="login_password_final_proof")
 
-# Validação direta por texto preenchido: Se os dados estiverem certos, o sistema abaixo abre na hora!
 if usuario_input.strip() == "admin" and senha_input.strip() == "123":
     st.sidebar.success("🟢 Sistema Conectado!")
     
@@ -125,7 +123,7 @@ if usuario_input.strip() == "admin" and senha_input.strip() == "123":
             "onde": str(item.get('onde', '')) if item.get('onde') else "",
             "id_responsavel": str(item.get('id_responsavel', '1')) if item.get('id_responsavel') else "1",
             "como": str(item.get('como', '')) if item.get('como') else "",
-            "quando_detalhe": str(item.get('quando_detalhe', '')) if item.get('quando_detalhe') else "",
+            "quando_detalhe": str(item.get('quando_detalhe', '')) if item.get('quando_detalhe', '')) else "",
             "status": str(item.get('status', 'Não Iniciado')),
             "prazo": item.get('prazo'),
             "url_arquivo": item.get('url_arquivo')
@@ -199,7 +197,7 @@ if usuario_input.strip() == "admin" and senha_input.strip() == "123":
         }).set_index("Status")
         st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
 
-    # --- LISTAGEM DOS ITENS SALVOS ---
+# --- LISTAGEM DOS ITENS SALVOS ---
     st.write("---")
     st.subheader("📋 Ações Registradas")
 
@@ -214,8 +212,8 @@ if usuario_input.strip() == "admin" and senha_input.strip() == "123":
         df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
         st.dataframe(df_tabela, use_container_width=True, hide_index=True)
         
-        # Injeção de CSS em linha única para o botão de PDF Cor Abóbora
-        st.html("<style>div[data-testid='stDownloadButton'] button {background-color: #FF6F00 !important; color: white !important; border: none !important;} div[data-testid='stDownloadButton'] button:hover {background-color: #E65100 !important; color: white !important Bif;}</style>")
+        # Injeção de CSS para o botão de PDF Cor Abóbora
+        st.html("<style>div[data-testid='stDownloadButton'] button {background-color: #FF6F00 !important; color: white !important; border: none !important;} div[data-testid='stDownloadButton'] button:hover {background-color: #E65100 !important; color: white !important;}</style>")
 
         # Botão do Relatório PDF Integrado
         pdf_data = gerar_pdf_atualizado(acoes)
@@ -235,3 +233,5 @@ if usuario_input.strip() == "admin" and senha_input.strip() == "123":
             id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_manutencao")
         
         with col_btn_ed:
+            if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_trigger_editar"):
+                item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
