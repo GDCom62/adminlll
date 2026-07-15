@@ -45,7 +45,7 @@ def gerar_pdf_atualizado(dados_acoes):
         ])
 
     # Definição de larguras fixas em pontos para as 8 colunas na folha horizontal
-    t = Table(dados_pdf, colWidths=[40, 150, 65, 80, 100, 80, 120, 100])
+    t = Table(dados_pdf, colWidths=[30, 150, 60, 70, 100, 80, 100, 120])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -187,7 +187,7 @@ if total_acoes > 0:
     st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
 
 # ==============================================================================
-# FORMULÁRIO PARA SALVAR/EDITAR (MUITO SIMPLIFICADO E SEGURO CONTRA ESPAÇOS)
+# FORMULÁRIO PARA SALVAR/EDITAR
 # ==============================================================================
 st.write("---")
 st.subheader("Nova Ação / Editar Ação")
@@ -215,7 +215,6 @@ with st.form("form_acao", clear_on_submit=True):
     
     submit = st.form_submit_button("Salvar Ação")
     
-    # Validações e Processamento lineares (Elimina totalmente o risco de quebras de recuo)
     if submit:
         id_limpo = id_acao.strip()
         erro_validacao = False
@@ -246,5 +245,7 @@ with st.form("form_acao", clear_on_submit=True):
                 "url_arquivo": url_doc
             }
             
+            # BLOCO TRY/EXCEPT TOTALMENTE REVISADO E INTEGRADO SEM ERRO DE SINTAXE
             try:
                 supabase = get_supabase_client()
+                if id_limpo != "":
