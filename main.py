@@ -43,7 +43,7 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    t = Table(dados_pdf, colWidths=[30, 130, 60, 70, 90, 80, 130, 130])
+    t = Table(dados_pdf, colWidths=[30, 140, 60, 70, 100, 80, 100, 120])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -101,11 +101,12 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         return False, f"Erro ao salvar no Supabase: {str(e)}"
 
 
-# --- TELA DE LOGIN BLINDADA PARA NUVEM ---
+# --- TELA DE LOGIN BLINDADA NA BARRA LATERAL (EVITA CONFLITOS DE ATUALIZAÇÃO) ---
 st.sidebar.markdown("<h2 style='text-align: center;'>🔐 Controle de Acesso</h2>", unsafe_allow_html=True)
 usuario_input = st.sidebar.text_input("Usuário", key="login_username_final_proof")
 senha_input = st.sidebar.text_input("Senha", type="password", key="login_password_final_proof")
 
+# Validação direta e linear
 if usuario_input.strip() == "admin" and senha_input.strip() == "123":
     st.sidebar.success("🟢 Sistema Conectado!")
     
@@ -115,20 +116,20 @@ if usuario_input.strip() == "admin" and senha_input.strip() == "123":
         "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
     }
 
-   if st.session_state['edit_item']:
-    item = st.session_state['edit_item']
-    valores_padrao = {
-        "id": str(item.get('id_acao', '')),
-        "descricao": str(item.get('descricao_acao', '')),
-        "porque": str(item.get('porque', '')) if item.get('porque') else "",
-        "onde": str(item.get('onde', '')) if item.get('onde') else "",
-        "id_responsavel": str(item.get('id_responsavel', '1')) if item.get('id_responsavel') else "1",
-        "como": str(item.get('como', '')) if item.get('como') else "",
-        "quando_detalhe": str(item.get('quando_detalhe', '')) if item.get('quando_detalhe') else "",
-        "status": str(item.get('status', 'Não Iniciado')),
-        "prazo": item.get('prazo'),
-        "url_arquivo": item.get('url_arquivo')
-    }
+    if st.session_state['edit_item']:
+        item = st.session_state['edit_item']
+        valores_padrao = {
+            "id": str(item.get('id_acao', '')),
+            "descricao": str(item.get('descricao_acao', '')),
+            "porque": str(item.get('porque', '')) if item.get('porque') else "",
+            "onde": str(item.get('onde', '')) if item.get('onde') else "",
+            "id_responsavel": str(item.get('id_responsavel', '1')) if item.get('id_responsavel') else "1",
+            "como": str(item.get('como', '')) if item.get('como') else "",
+            "quando_detalhe": str(item.get('quando_detalhe', '')) if item.get('quando_detalhe') else "",
+            "status": str(item.get('status', 'Não Iniciado')),
+            "prazo": item.get('prazo'),
+            "url_arquivo": item.get('url_arquivo')
+        }
 
     # --- TITULO PRINCIPAL ---
     st.title("Plano de Ação - Administrativo")
@@ -198,7 +199,7 @@ if usuario_input.strip() == "admin" and senha_input.strip() == "123":
         }).set_index("Status")
         st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
 
-# --- LISTAGEM DOS ITENS SALVOS ---
+    # --- LISTAGEM DOS ITENS SALVOS ---
     st.write("---")
     st.subheader("📋 Ações Registradas")
 
@@ -235,4 +236,3 @@ if usuario_input.strip() == "admin" and senha_input.strip() == "123":
         
         with col_btn_ed:
             if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_trigger_editar"):
-                item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
