@@ -44,8 +44,7 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    # Definição de larguras fixas em pontos para as 8 colunas na folha horizontal
-    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 100, 100])
+    t = Table(dados_pdf, colWidths=[40, 150, 60, 70, 100, 80, 100, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -187,7 +186,7 @@ if total_acoes > 0:
     st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
 
 # ==============================================================================
-# FORMULÁRIO PARA SALVAR/EDITAR
+# FORMULÁRIO PARA SALVAR/EDITAR (ESTRUTURA TOTALMENTE FLUIDA CONTRA ESPAÇOS)
 # ==============================================================================
 st.write("---")
 st.subheader("Nova Ação / Editar Ação")
@@ -228,11 +227,8 @@ with st.form("form_acao", clear_on_submit=True):
             
         if not erro_validacao:
             id_resp = str(dict_usuarios.get(nome_resp)) if (not modo_responsavel_manual and dict_usuarios) else responsavel_manual_id.strip()
+            url_doc = fazer_upload_storage(arquivo_evidencia) if arquivo_evidencia else None
             
-            url_doc = None
-            if arquivo_evidencia:
-                url_doc = fazer_upload_storage(arquivo_evidencia)
-                
             dados_acao = {
                 "descricao_acao": descricao,
                 "porque": porque,
@@ -245,7 +241,9 @@ with st.form("form_acao", clear_on_submit=True):
                 "url_arquivo": url_doc
             }
             
-            # BLOCO TRY/EXCEPT CORRIGIDO E FECHADO DE FORMA INCONTESTÁVEL
             try:
                 supabase = get_supabase_client()
                 if id_limpo != "":
+                    supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
+                else:
+                    supabase.table("Acoes").insert(dados_acao).execute()
