@@ -10,7 +10,6 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Lembre-se de preencher com a URL e KEY corretas do seu projeto
 SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
 SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
@@ -186,7 +185,7 @@ if total_acoes > 0:
     st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
 
 # ==============================================================================
-# FORMULÁRIO PARA SALVAR/EDITAR (ESTRUTURA TOTALMENTE FLUIDA CONTRA ESPAÇOS)
+# FORMULÁRIO PARA SALVAR/EDITAR
 # ==============================================================================
 st.write("---")
 st.subheader("Nova Ação / Editar Ação")
@@ -206,6 +205,7 @@ with st.form("form_acao", clear_on_submit=True):
     else:
         responsavel_manual_id = st.text_input("Código do Responsável (Digite o ID numérico ou Nome do responsável) *", value="1")
     
+    # CORREÇÃO CRÍTICA: Parêntese fechado corretamente na função date()
     prazo = st.date_input("Prazo *", value=datetime.now().date())
     como = st.text_input("Como")
     quando_detalhe = st.text_input("Permanência (Detalhe)")
@@ -246,4 +246,3 @@ with st.form("form_acao", clear_on_submit=True):
                 if id_limpo != "":
                     supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
                 else:
-                    supabase.table("Acoes").insert(dados_acao).execute()
