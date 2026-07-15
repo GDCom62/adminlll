@@ -18,7 +18,7 @@ def get_supabase_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- FUNÇÃO ISOLADA PARA GERAR O RELATÓRIO PDF ---
-def generar_pdf_atualizado(dados_acoes):
+def gerar_pdf_atualizado(dados_acoes):
     buffer_pdf = io.BytesIO()
     from reportlab.lib.pagesizes import landscape, A4
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -44,8 +44,8 @@ def generar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    # Definição de larguras fixas em pontos para as colunas na folha A4 Paisagem
-    t = Table(dados_pdf, colWidths=[40, 150, 65, 80, 100, 80, 100, 100])
+    # Definição de larguras fixas em pontos para as 8 colunas na folha horizontal
+    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 100, 120])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -187,7 +187,7 @@ if total_acoes > 0:
     st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
 
 # ==============================================================================
-# FORMULÁRIO PARA SALVAR/EDITAR (ALINHAMENTO BLINDADO)
+# FORMULÁRIO PARA SALVAR/EDITAR
 # ==============================================================================
 st.write("---")
 st.subheader("Nova Ação / Editar Ação")
@@ -218,13 +218,11 @@ with st.form("form_acao", clear_on_submit=True):
     if submit:
         id_limpo = id_acao.strip()
         
-        # Validações primárias simples sem aninhamentos complexos
         if id_limpo != "" and not id_limpo.isdigit():
             st.error("Erro: O ID da Ação precisa ser um número inteiro válido (ex: 1, 5, 12).")
         elif not descricao:
             st.error("A descrição (O que) é obrigatória.")
         else:
-            # Captura o responsável de acordo com o modo ativo
             id_resp = str(dict_usuarios.get(nome_resp)) if (not modo_responsavel_manual and dict_usuarios) else responsavel_manual_id.strip()
             
             url_doc = None
@@ -243,7 +241,9 @@ with st.form("form_acao", clear_on_submit=True):
                 "url_arquivo": url_doc
             }
             
-            # Execução direta e limpa do banco Supabase
+            # CORREÇÃO CRÍTICA DE INDENTAÇÃO: Todo o bloco try/except alinhado corretamente debaixo do if/else
             try:
                 supabase = get_supabase_client()
                 if id_limpo != "":
+                    supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
+                else:
