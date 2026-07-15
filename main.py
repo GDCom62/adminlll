@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit st as st
 import pandas as pd
 import base64
 import os
@@ -44,7 +44,7 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    t = Table(dados_pdf, colWidths=[40, 160, 65, 75, 95, 85, 95, 95])
+    t = Table(dados_pdf, colWidths=[40, 150, 70, 70, 90, 80, 100, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -114,18 +114,25 @@ with col_log:
         st.session_state['logado'] = False
         st.rerun()
 
-# 1. Buscar Ações e Usuários de forma protegida no Supabase
+# 1. Buscar Ações de forma direta no Supabase
 acoes = []
 usuarios = []
 try:
     supabase = get_supabase_client()
     resposta_acoes = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
-    resposta_usuarios = supabase.table("usuarios").select("*").execute()
-    
     acoes = resposta_acoes.data if hasattr(resposta_acoes, "data") else []
-    usuarios = resposta_usuarios.data if hasattr(resposta_usuarios, "data") else []
 except Exception as e:
-    st.error(f"Erro ao carregar dados do Supabase: {e}")
+    st.error(f"Erro ao carregar dados do Supabase (Tabela Acoes): {e}")
+
+# 2. Tentar buscar usuários de forma segura (Se falhar, ativa o modo de texto manual)
+modo_responsavel_manual = False
+try:
+    supabase = get_supabase_client()
+    resposta_usuarios = supabase.table("usuarios").select("*").execute()
+    usuarios = resposta_usuarios.data if hasattr(resposta_usuarios, "data") else []
+except Exception:
+    # Se der erro PGRST205, o aplicativo ativa o plano B automaticamente
+    modo_responsavel_manual = True
 
 # --- INDICADORES GRÁFICOS E METRICAS ---
 st.write("---")
@@ -180,7 +187,7 @@ if total_acoes > 0:
     st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
 
 # ==============================================================================
-# FORMULÁRIO PARA SALVAR/EDITAR (ADAPTADO PARA SUPABASE)
+# FORMULÁRIO PARA SALVAR/EDITAR
 # ==============================================================================
 st.write("---")
 st.subheader("Nova Ação / Editar Ação")
@@ -192,12 +199,15 @@ with st.form("form_acao", clear_on_submit=True):
     porque = st.text_input("Por que")
     onde = st.text_input("Onde")
     
+    # Gerencia a exibição do campo de responsável baseado no banco
     dict_usuarios = {}
-    if usuarios:
+    if not modo_responsavel_manual and usuarios:
         for u in usuarios:
             dict_usuarios[u.get('nome', 'Sem Nome')] = u.get('id_usuario', '1')
-        
-    nome_resp = st.selectbox("Responsável (Quem) *", list(dict_usuarios.keys())) if dict_usuarios else st.selectbox("Responsável", ["Nenhum usuário localizado no banco"])
+        nome_resp = st.selectbox("Responsável (Quem) *", list(dict_usuarios.keys()))
+    else:
+        # PLANO B: Se a tabela não existir, vira um campo numérico simples (Evita o erro PGRST205)
+        responsavel_manual_id = st.text_input("Código do Responsável (Digite o ID numérico do responsável) *", value="1")
     
     prazo = st.date_input("Prazo *", value=datetime.now().date())
     como = st.text_input("Como")
@@ -213,12 +223,13 @@ with st.form("form_acao", clear_on_submit=True):
             st.error("Erro: O ID da Ação precisa ser um número inteiro válido (ex: 1, 5, 12).")
         elif not descricao:
             st.error("A descrição (O que) é obrigatória.")
-        elif not dict_usuarios:
-            st.error("Erro: Não há conexão ativa com o banco de dados para buscar usuários responsáveis.")
         else:
-            id_resp = dict_usuarios.get(nome_resp)
+            # Captura o ID correto do responsável dependendo do modo ativo
+            if not modo_responsavel_manual and dict_usuarios:
+                id_resp = str(dict_usuarios.get(nome_resp))
+            else:
+                id_resp = responsavel_manual_id.strip() if responsavel_manual_id.strip().isdigit() else "1"
             
-            # Executa o upload do anexo caso o usuário suba um arquivo
             url_doc = None
             if arquivo_evidencia:
                 url_doc = fazer_upload_storage(arquivo_evidencia)
@@ -227,7 +238,7 @@ with st.form("form_acao", clear_on_submit=True):
                 "descricao_acao": descricao,
                 "porque": porque,
                 "onde": onde,
-                "id_responsavel": str(id_resp),
+                "id_responsavel": id_resp,
                 "prazo": prazo.strftime('%Y-%m-%d'),
                 "como": como,
                 "quando_detalhe": quando_detalhe,
@@ -236,14 +247,3 @@ with st.form("form_acao", clear_on_submit=True):
             }
             
             try:
-                supabase = get_supabase_client()
-                if id_limpo != "":
-                    supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
-                else:
-                    supabase.table("Acoes").insert(dados_acao).execute()
-                    
-                st.success("Ação salva com sucesso!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Não foi possível salvar os dados no Supabase. Erro: {e}")
-
