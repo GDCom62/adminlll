@@ -9,8 +9,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Lembre-se de preencher com a URL e KEY corretas do seu projeto
-SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
+SUPABASE_URL = "https://supabase.co" 
 SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
 def get_supabase_client() -> Client:
@@ -43,7 +42,7 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    t = Table(dados_pdf, colWidths=[30, 130, 65, 75, 90, 80, 100, 130])
+    t = Table(dados_pdf, colWidths=[30, 130, 55, 65, 90, 80, 100, 150])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -103,7 +102,7 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         return False, f"Erro ao salvar no Supabase: {str(e)}"
 
 
-# --- TELA DE LOGIN RESTAURADA COM BOTÃO "ENTRAR" PERSISTENTE ---
+# --- TELA DE LOGIN FORMATO BLINDADO (SUMA DA TELA APÓS LOGAR) ---
 if not st.session_state['logado']:
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
@@ -114,23 +113,21 @@ if not st.session_state['logado']:
             
         st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
         
-        # O uso de st.form com chaves dedicadas impede que a nuvem limpe o clique na reexecução
-        with st.form(key="login_form"):
-            usuario_input = st.text_input("Usuário", key="login_user_field")
-            senha_input = st.text_input("Senha", type="password", key="login_pass_field")
+        with st.form(key="login_form_final"):
+            usuario_input = st.text_input("Usuário")
+            senha_input = st.text_input("Senha", type="password")
             botao_entrar = st.form_submit_button("Entrar", use_container_width=True)
             
             if botao_entrar:
                 if usuario_input.strip() == "admin" and senha_input.strip() == "123":
                     st.session_state['logado'] = True
-                    st.success("Acesso concedido!")
-                    st.rerun()
+                    st.rerun()  # Recarrega limpando visualmente este formulário para sempre
                 else:
                     st.error("Usuário ou senha incorretos.")
-    st.stop()
+    st.stop()  # Trava o script aqui caso não passe pelo if acima
 
 # ==============================================================================
-# SISTEMA PRINCIPAL (SÓ LIBERA APÓS SUCESSO DO BOTÃO ENTRAR DO FORMULÁRIO)
+# SISTEMA PRINCIPAL (SÓ EXISTE SE ESTIVER LOGADO - PROTEGIDO CONTRA RERUNS)
 # ==============================================================================
 
 # --- CONFIGURAÇÃO DE VALORES PADRÃO (SUPORTE DE EDIÇÃO) ---
@@ -154,7 +151,7 @@ if st.session_state['edit_item']:
         "url_arquivo": item.get('url_arquivo')
     }
 
-# --- PAINEL PRINCIPAL COM BOTÃO DE LOGOUT NO TOPO ---
+# --- PAINEL PRINCIPAL COM BOTÃO DE LOGOUT ---
 col_tit, col_log = st.columns(2)
 with col_tit:
     st.title("Plano de Ação - Administrativo")
@@ -178,7 +175,7 @@ try:
 except Exception as e:
     st.error(f"Erro ao carregar dados do Supabase: {e}")
 
-# --- INDICADORES GRÁFICOS E METRICAS TURBINADAS ---
+# --- INDICADORES GRÁFICOS E METRICAS ---
 st.write("---")
 st.subheader("📊 Painel de Monitoramento Geral")
 
