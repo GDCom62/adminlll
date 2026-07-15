@@ -1,4 +1,4 @@
-import streamlit st as st
+import streamlit as st
 import pandas as pd
 import base64
 import os
@@ -44,7 +44,7 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    t = Table(dados_pdf, colWidths=[40, 150, 70, 70, 90, 80, 100, 100])
+    t = Table(dados_pdf, colWidths=[40, 150, 60, 70, 100, 80, 100, 120])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -131,7 +131,7 @@ try:
     resposta_usuarios = supabase.table("usuarios").select("*").execute()
     usuarios = resposta_usuarios.data if hasattr(resposta_usuarios, "data") else []
 except Exception:
-    # Se der erro PGRST205, o aplicativo ativa o plano B automaticamente
+    # Se der erro PGRST205 (tabela faltante), o aplicativo ativa o plano B automaticamente
     modo_responsavel_manual = True
 
 # --- INDICADORES GRÁFICOS E METRICAS ---
@@ -206,8 +206,8 @@ with st.form("form_acao", clear_on_submit=True):
             dict_usuarios[u.get('nome', 'Sem Nome')] = u.get('id_usuario', '1')
         nome_resp = st.selectbox("Responsável (Quem) *", list(dict_usuarios.keys()))
     else:
-        # PLANO B: Se a tabela não existir, vira um campo numérico simples (Evita o erro PGRST205)
-        responsavel_manual_id = st.text_input("Código do Responsável (Digite o ID numérico do responsável) *", value="1")
+        # PLANO B: Se a tabela usuários não existir, vira um campo de texto simples estável
+        responsavel_manual_id = st.text_input("Código do Responsável (Digite o ID numérico ou Nome do responsável) *", value="1")
     
     prazo = st.date_input("Prazo *", value=datetime.now().date())
     como = st.text_input("Como")
@@ -228,7 +228,7 @@ with st.form("form_acao", clear_on_submit=True):
             if not modo_responsavel_manual and dict_usuarios:
                 id_resp = str(dict_usuarios.get(nome_resp))
             else:
-                id_resp = responsavel_manual_id.strip() if responsavel_manual_id.strip().isdigit() else "1"
+                id_resp = responsavel_manual_id.strip()
             
             url_doc = None
             if arquivo_evidencia:
@@ -247,3 +247,4 @@ with st.form("form_acao", clear_on_submit=True):
             }
             
             try:
+                supabase = get_supabase_client()
