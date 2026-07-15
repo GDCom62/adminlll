@@ -9,7 +9,8 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-SUPABASE_URL = "https://supabase.co" 
+# Lembre-se de preencher com a URL e KEY corretas do seu projeto
+SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
 SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
 def get_supabase_client() -> Client:
