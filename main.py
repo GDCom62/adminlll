@@ -115,20 +115,20 @@ if usuario_input.strip() == "admin" and senha_input.strip() == "123":
         "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
     }
 
-    if st.session_state['edit_item']:
-        item = st.session_state['edit_item']
-        valores_padrao = {
-            "id": str(item.get('id_acao', '')),
-            "descricao": str(item.get('descricao_acao', '')),
-            "porque": str(item.get('porque', '')) if item.get('porque') else "",
-            "onde": str(item.get('onde', '')) if item.get('onde') else "",
-            "id_responsavel": str(item.get('id_responsavel', '1')) if item.get('id_responsavel') else "1",
-            "como": str(item.get('como', '')) if item.get('como') else "",
-            "quando_detalhe": str(item.get('quando_detalhe', '')) if item.get('quando_detalhe', '')) else "",
-            "status": str(item.get('status', 'Não Iniciado')),
-            "prazo": item.get('prazo'),
-            "url_arquivo": item.get('url_arquivo')
-        }
+   if st.session_state['edit_item']:
+    item = st.session_state['edit_item']
+    valores_padrao = {
+        "id": str(item.get('id_acao', '')),
+        "descricao": str(item.get('descricao_acao', '')),
+        "porque": str(item.get('porque', '')) if item.get('porque') else "",
+        "onde": str(item.get('onde', '')) if item.get('onde') else "",
+        "id_responsavel": str(item.get('id_responsavel', '1')) if item.get('id_responsavel') else "1",
+        "como": str(item.get('como', '')) if item.get('como') else "",
+        "quando_detalhe": str(item.get('quando_detalhe', '')) if item.get('quando_detalhe') else "",
+        "status": str(item.get('status', 'Não Iniciado')),
+        "prazo": item.get('prazo'),
+        "url_arquivo": item.get('url_arquivo')
+    }
 
     # --- TITULO PRINCIPAL ---
     st.title("Plano de Ação - Administrativo")
