@@ -221,7 +221,7 @@ with st.form("form_acao", clear_on_submit=False):
     else:
         responsavel_manual_id = st.text_input("Código do Responsável (Digite o ID numérico ou Nome) *", value=str(v_edicao.get('id_usuario', '1')))
     
-    # CORREÇÃO DA LINHA 178: Data padrão ou data recuperada da edição
+    # Data padrão ou data recuperada da edição
     data_padrao = hoje
     if v_edicao.get('prazo'):
         try:
@@ -242,5 +242,5 @@ with st.form("form_acao", clear_on_submit=False):
     status = st.selectbox("Status", lista_status, index=index_status)
     arquivo_anexo = st.file_uploader("Anexar arquivo/evidência", type=["pdf", "png", "jpg", "xlsx", "docx"])
     
-    c_btn1, c_btn2 = st.columns(2)
+    c_btn1, c_btn2 = st.columns(2)                                             
     with c_btn1:
