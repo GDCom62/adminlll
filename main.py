@@ -43,7 +43,7 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    t = Table(dados_pdf, colWidths=[30, 140, 60, 70, 100, 80, 100, 120])
+    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 100, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -101,12 +101,11 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
         return False, f"Erro ao salvar no Supabase: {str(e)}"
 
 
-# --- TELA DE LOGIN BLINDADA NA BARRA LATERAL (EVITA CONFLITOS DE ATUALIZAÇÃO) ---
+# --- TELA DE LOGIN BLINDADA NA BARRA LATERAL ---
 st.sidebar.markdown("<h2 style='text-align: center;'>🔐 Controle de Acesso</h2>", unsafe_allow_html=True)
 usuario_input = st.sidebar.text_input("Usuário", key="login_username_final_proof")
 senha_input = st.sidebar.text_input("Senha", type="password", key="login_password_final_proof")
 
-# Validação direta e linear
 if usuario_input.strip() == "admin" and senha_input.strip() == "123":
     st.sidebar.success("🟢 Sistema Conectado!")
     
@@ -236,3 +235,4 @@ if usuario_input.strip() == "admin" and senha_input.strip() == "123":
         
         with col_btn_ed:
             if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_trigger_editar"):
+                item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
