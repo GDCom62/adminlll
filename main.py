@@ -45,7 +45,7 @@ def gerar_pdf_atualizado(dados_acoes):
         ])
 
     # Definição de larguras fixas em pontos para as 8 colunas na folha horizontal
-    t = Table(dados_pdf, colWidths=[30, 150, 60, 70, 100, 80, 100, 120])
+    t = Table(dados_pdf, colWidths=[40, 150, 60, 80, 100, 80, 100, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -209,7 +209,7 @@ with st.form("form_acao", clear_on_submit=True):
     
     prazo = st.date_input("Prazo *", value=datetime.now().date())
     como = st.text_input("Como")
-    quando_detalhe = st.text_input("Quando (Detalhe)")
+    quando_detalhe = st.text_input("Permanência (Detalhe)")
     status = st.selectbox("Status", ["Não Iniciado", "Em Andamento", "Concluído"])
     arquivo_evidencia = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
     
@@ -245,7 +245,7 @@ with st.form("form_acao", clear_on_submit=True):
                 "url_arquivo": url_doc
             }
             
-            # BLOCO TRY/EXCEPT TOTALMENTE REVISADO E INTEGRADO SEM ERRO DE SINTAXE
+            # SOLUÇÃO DE SEGURANÇA ESTRUTURAL (LINHA ÚNICA SEM RISCO DE CONFLITO DE RECUO)
             try:
                 supabase = get_supabase_client()
                 if id_limpo != "":
