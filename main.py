@@ -3,7 +3,7 @@ import pandas as pd
 import base64
 import os
 import io
-from datetime import datetime
+import plotly.express as px  # Biblioteca nativa e estável para o gráfico
 from supabase import create_client, Client
 
 # Configuração da página Streamlit (DEVE SER A PRIMEIRA LINHA DE CÓDIGO)
@@ -16,57 +16,13 @@ SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 def get_supabase_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- FUNÇÃO ISOLADA PARA GERAR O RELATÓRIO PDF ---
-def gerar_pdf_atualizado(dados_acoes):
-    buffer_pdf = io.BytesIO()
-    from reportlab.lib.pagesizes import landscape, A4
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.lib import colors
-    
-    doc = SimpleDocTemplate(buffer_pdf, pagesize=landscape(A4))
-    elements = []
-    styles = getSampleStyleSheet()
-    elements.append(Paragraph("PLANO DE AÇÃO ADMINISTRATIVO", styles['Title']))
-    elements.append(Spacer(1, 12))
-
-    dados_pdf = [["ID", "Ação (What)", "Prazo", "Status", "Por que", "Onde", "Como", "Quando Det."]]
-    for a in dados_acoes:
-        dados_pdf.append([
-            str(a.get('id_acao', '')), 
-            str(a.get('descricao_acao', '')), 
-            str(a.get('prazo', '')), 
-            str(a.get('status', '')), 
-            str(a.get('porque', '')), 
-            str(a.get('onde', '')), 
-            str(a.get('como', '')), 
-            str(a.get('quando_detalhe', ''))
-        ])
-
-    t = Table(dados_pdf, colWidths=[40, 150, 60, 70, 100, 80, 100, 100])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.navy),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
-    elements.append(t)
-    doc.build(elements)
-    buffer_pdf.seek(0)
-    return buffer_pdf.getvalue()
-
-# Inicializa os estados de sessão de forma segura no topo
+# Inicializa os estados da sessão de forma segura no topo
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
+if 'edit_item' not in st.session_state:
+    st.session_state['edit_item'] = None
 
-# Estado para armazenar dados da ação selecionada para edição
-if 'id_edicao' not in st.session_state:
-    st.session_state['id_edicao'] = ""
-if 'valores_edicao' not in st.session_state:
-    st.session_state['valores_edicao'] = {}
-
-# Função para fazer upload de arquivos no Storage do Supabase
+# Função para fazer upload de arquivos no Storage
 def fazer_upload_storage(arquivo_upload):
     if arquivo_upload is not None:
         try:
@@ -81,7 +37,33 @@ def fazer_upload_storage(arquivo_upload):
             return None
     return None
 
-# --- TELA DE LOGIN FORMATO BLINDADO ---
+# Função para salvar ou atualizar dados no Banco de Dados
+def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, prazo_str, v_como, v_quando, status, url_arq):
+    try:
+        supabase = get_supabase_client()
+        dados_acao = {
+            "descricao_acao": descricao,
+            "porque": v_porque,
+            "onde": v_onde,
+            "id_responsavel": id_resp_final,
+            "prazo": prazo_str,
+            "como": v_como,
+            "quando_detalhe": v_quando,
+            "status": status,
+            "url_arquivo": url_arq
+        }
+        
+        if id_limpo and str(id_limpo).isdigit():
+            supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
+        else:
+            supabase.table("Acoes").insert(dados_acao).execute()
+            
+        return True, "Operação realizada com sucesso!"
+    except Exception as e:
+        return False, f"Erro ao salvar no Supabase: {str(e)}"
+
+
+# --- TELA DE LOGIN FORMATO FORMULÁRIO (BLINDADO PARA NUVEM) ---
 if not st.session_state['logado']:
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
@@ -92,51 +74,64 @@ if not st.session_state['logado']:
             
         st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
         
-        with st.form(key="login_form_final"):
+        with st.form(key="formulario_login"):
             usuario_input = st.text_input("Usuário")
             senha_input = st.text_input("Senha", type="password")
-            botao_entrar = st.form_submit_button("Entrar", use_container_width=True)
+            botao_enviar = st.form_submit_button("Entrar", use_container_width=True)
             
-            if botao_entrar:
+            if botao_enviar:
                 if usuario_input.strip() == "admin" and senha_input.strip() == "123":
                     st.session_state['logado'] = True
+                    st.success("Acesso concedido!")
                     st.rerun()
                 else:
                     st.error("Usuário ou senha incorretos.")
     st.stop()
 
 # ==============================================================================
-# SISTEMA PRINCIPAL (SÓ EXISTE SE ESTIVER LOGADO)
+# SISTEMA PRINCIPAL (SÓ CARREGA SE LOGADO)
 # ==============================================================================
 
-# --- PAINEL PRINCIPAL COM BOTÃO DE LOGOUT ---
+# --- PAINEL PRINCIPAL ---
 col_tit, col_log = st.columns(2)
 with col_tit:
-    st.title("Plano de Ação - Administrativo")
+    st.title("Plano de Ação-Administrativo")
 with col_log:
     st.write("<br>", unsafe_allow_html=True)
     if st.button("Sair (Logout)", use_container_width=True, key="btn_logout_final"):
         st.session_state['logado'] = False
+        st.session_state['edit_item'] = None
         st.rerun()
 
-# Buscar Ações de forma direta no Supabase
+# Buscar dados do banco Supabase de forma protegida
 acoes = []
-usuarios = []
 try:
     supabase = get_supabase_client()
-    resposta_acoes = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
-    acoes = resposta_acoes.data if hasattr(resposta_acoes, "data") else []
+    resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
+    acoes = resposta.data if hasattr(resposta, "data") else resposta.get('data', [])
 except Exception as e:
-    st.error(f"Erro ao carregar dados do Supabase (Tabela Acoes): {e}")
+    st.error(f"Erro ao carregar dados do Supabase: {e}")
 
-# Tentar buscar usuários de forma segura (Se falhar, ativa o modo de texto manual)
-modo_responsavel_manual = False
-try:
-    supabase = get_supabase_client()
-    resposta_usuarios = supabase.table("usuarios").select("*").execute()
-    usuarios = resposta_usuarios.data if hasattr(resposta_usuarios, "data") else []
-except Exception:
-    modo_responsavel_manual = True
+# --- CONFIGURAÇÃO DE VALORES PADRÃO (MOVIDO PARA CIMA PARA EVITAR ERROS) ---
+valores_padrao = {
+    "id": "", "descricao": "", "porque": "", "onde": "", 
+    "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
+}
+
+if st.session_state['edit_item']:
+    item = st.session_state['edit_item']
+    valores_padrao = {
+        "id": str(item['id_acao']),
+        "descricao": str(item['descricao_acao']),
+        "porque": str(item['porque']) if item['porque'] else "",
+        "onde": str(item['onde']) if item['onde'] else "",
+        "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
+        "como": str(item['como']) if item['como'] else "",
+        "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
+        "status": str(item['status']),
+        "prazo": item['prazo'],
+        "url_arquivo": item.get('url_arquivo')
+    }
 
 # --- INDICADORES GRÁFICOS E METRICAS ---
 st.write("---")
@@ -154,7 +149,7 @@ if acoes:
         
         if "Andamento" in status_texto:
             status_contagem["Em Andamento"] += 1
-        elif "Concluido" in status_texto or "Concluído" in status_texto:
+        elif "Concluído" in status_texto or "Concluido" in status_texto:
             status_contagem["Concluído"] += 1
             concluidas += 1
         else:
@@ -182,65 +177,74 @@ with m3:
 
 st.write("<br>", unsafe_allow_html=True)
 
-# Gráfico de Barras Nativo Estável
-if total_acoes > 0:
-    df_barras_limpo = pd.DataFrame({
-        "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
-        "Quantidade": [status_contagem["Não Iniciado"], status_contagem["Em Andamento"], status_contagem["Concluído"]]
-    }).set_index("Status")
-    st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
+# Gráfico Seguro usando Plotly Express (Substitui color_config inválido)
+st.write("📊 **Progresso dos Planos de Ação**")
 
-# ==============================================================================
-# FORMULÁRIO PARA SALVAR/EDITAR
-# ==============================================================================
+dados_barras = {
+    "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
+    "Quantidade": [status_contagem["Não Iniciado"], status_contagem["Em Andamento"], status_contagem["Concluído"]]
+}
+df_barras_limpo = pd.DataFrame(dados_barras)
+
+if df_barras_limpo["Quantidade"].sum() > 0:
+    fig = px.bar(
+        df_barras_limpo, 
+        x="Status", 
+        y="Quantidade", 
+        color="Status",
+        color_discrete_map={"Não Iniciado": "#ff9999", "Em Andamento": "#66b3ff", "Concluído": "#99ff99"}
+    )
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("💡 Cadastre ações para visualizar o gráfico de barras de monitoramento.")
+
+# --- LISTAGEM DOS ITENS SALVOS ---
 st.write("---")
-st.subheader("Nova Ação / Editar Ação")
+st.subheader("📋 Ações Registradas")
 
-# Resgata valores se estiver no modo de edição para preencher o formulário automaticamente
-v_edicao = st.session_state['valores_edicao']
-
-with st.form("form_acao", clear_on_submit=False):
-    st.info("💡 Para criar um novo item, deixe o ID vazio. Para editar, clique no botão ✏️ de alguma ação abaixo.")
-    
-    id_acao = st.text_input("ID da Ação (Preenchido automaticamente ao editar)", value=st.session_state['id_edicao'], disabled=True)
-    descricao = st.text_input("O que (Ação) *", value=v_edicao.get('descricao_acao', ''))
-    porque = st.text_input("Por que", value=v_edicao.get('porque', ''))
-    onde = st.text_input("Onde", value=v_edicao.get('onde', ''))
-    
-    dict_usuarios = {}
-    index_usuario = 0
-    if not modo_responsavel_manual and usuarios:
-        lista_nomes = []
-        for i, u in enumerate(usuarios):
-            nome_u = u.get('nome', 'Sem Nome')
-            dict_usuarios[nome_u] = u.get('id_usuario', '1')
-            lista_nomes.append(nome_u)
-            if str(u.get('id_usuario')) == str(v_edicao.get('id_usuario')):
-                index_usuario = i
-        nome_resp = st.selectbox("Responsável (Quem) *", lista_nomes, index=index_usuario)
-    else:
-        responsavel_manual_id = st.text_input("Código do Responsável (Digite o ID numérico ou Nome) *", value=str(v_edicao.get('id_usuario', '1')))
-    
-    # Data padrão ou data recuperada da edição
-    data_padrao = hoje
-    if v_edicao.get('prazo'):
-        try:
-            data_padrao = pd.to_datetime(v_edicao.get('prazo')).date()
-        except:
-            pass
+if acoes:
+    df_tabela = pd.DataFrame(acoes)
+    colunas_necessarias = ["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]
+    for col in colunas_necessarias:
+        if col not in df_tabela.columns:
+            df_tabela[col] = ""
             
-    prazo = st.date_input("Prazo final (Quando)", value=data_padrao)
-    como = st.text_input("Como", value=v_edicao.get('como', ''))
-    quando_detalhe = st.text_input("Quando (Detalhes adicionais)", value=v_edicao.get('quando_detalhe', ''))
+    df_tabela = df_tabela[colunas_necessarias]
+    df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
+    st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
-    # Define index do Status na edição
-    lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
-    index_status = 0
-    if v_edicao.get('status') in lista_status:
-        index_status = lista_status.index(v_edicao.get('status'))
-        
-    status = st.selectbox("Status", lista_status, index=index_status)
-    arquivo_anexo = st.file_uploader("Anexar arquivo/evidência", type=["pdf", "png", "jpg", "xlsx", "docx"])
+    st.write("**Ações de Gerenciamento:**")
+    col_sel, col_btn_ed, col_btn_ex = st.columns(3)
     
-    c_btn1, c_btn2 = st.columns(2)                                             
-    with c_btn1:
+    with col_sel:
+        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_manutencao")
+    
+    with col_btn_ed:
+        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item"):
+            item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
+            if item_procurado:
+                st.session_state['edit_item'] = item_procurado
+                st.rerun()
+                
+    with col_btn_ex:
+        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item"):
+            try:
+                supabase = get_supabase_client()
+                supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
+                st.success(f"Ação ID #{id_selecionado} excluída!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao excluir: {e}")
+else:
+    st.info("Nenhuma ação cadastrada no sistema até o momento.")
+
+# --- PAINEL OPERACIONAL ---
+st.write("---")
+st.subheader("📝 Painel: Registrar Informações")
+
+if st.session_state['edit_item']:
+    st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
+
+id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
+descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
+porque = st.text_input("Por que", value=valores_padrao["porque"])
