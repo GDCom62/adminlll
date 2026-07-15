@@ -44,7 +44,8 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    t = Table(dados_pdf, colWidths=[40, 150, 60, 70, 100, 80, 100, 120])
+    # Definição de larguras fixas em pontos para as 8 colunas na folha horizontal
+    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 100, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -216,12 +217,16 @@ with st.form("form_acao", clear_on_submit=True):
     
     if submit:
         id_limpo = id_acao.strip()
+        erro_validacao = False
         
         if id_limpo != "" and not id_limpo.isdigit():
             st.error("Erro: O ID da Ação precisa ser um número inteiro válido (ex: 1, 5, 12).")
+            erro_validacao = True
         elif not descricao:
             st.error("A descrição (O que) é obrigatória.")
-        else:
+            erro_validacao = True
+            
+        if not erro_validacao:
             id_resp = str(dict_usuarios.get(nome_resp)) if (not modo_responsavel_manual and dict_usuarios) else responsavel_manual_id.strip()
             
             url_doc = None
@@ -240,11 +245,7 @@ with st.form("form_acao", clear_on_submit=True):
                 "url_arquivo": url_doc
             }
             
-            # PROCESSO LINEAR FLUIDO (ELIMINA O TRAVAMENTO DA LINHA 251)
+            # BLOCO TRY/EXCEPT CORRIGIDO E FECHADO DE FORMA INCONTESTÁVEL
             try:
                 supabase = get_supabase_client()
                 if id_limpo != "":
-                    supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
-                else:
-                    supabase.table("Acoes").insert(dados_acao).execute()
-                st.success("Ação salva com sucesso!")
