@@ -44,8 +44,8 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    # Larguras das 8 colunas definidas em pontos para folha A4 Paisagem
-    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 120, 100])
+    # DEFINIÇÃO DE LARGURAS VÁLIDAS PARA AS 8 COLUNAS NA FOLHA PAISAGEM
+    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 100, 120])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -243,7 +243,7 @@ with st.form("form_acao", clear_on_submit=True):
                 "url_arquivo": url_doc
             }
             
-            # CORREÇÃO DEFINITIVA: Bloco try/except estruturado perfeitamente e fechado sem erros
+            # BLOCO TRY/EXCEPT CORRIGIDO E COM IDENTAÇÃO PERFEITA
             try:
                 supabase = get_supabase_client()
                 if id_limpo != "":
