@@ -45,7 +45,7 @@ def gerar_pdf_atualizado(dados_acoes):
         ])
 
     # Definição de larguras fixas em pontos para as 8 colunas na folha horizontal
-    t = Table(dados_pdf, colWidths=[40, 150, 70, 70, 100, 80, 120, 100])
+    t = Table(dados_pdf, colWidths=[40, 150, 65, 80, 100, 80, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -187,7 +187,7 @@ if total_acoes > 0:
     st.bar_chart(df_barras_limpo, y="Quantidade", color="#66b3ff")
 
 # ==============================================================================
-# FORMULÁRIO PARA SALVAR/EDITAR
+# FORMULÁRIO PARA SALVAR/EDITAR (MUITO SIMPLIFICADO E SEGURO CONTRA ESPAÇOS)
 # ==============================================================================
 st.write("---")
 st.subheader("Nova Ação / Editar Ação")
@@ -215,15 +215,19 @@ with st.form("form_acao", clear_on_submit=True):
     
     submit = st.form_submit_button("Salvar Ação")
     
+    # Validações e Processamento lineares (Elimina totalmente o risco de quebras de recuo)
     if submit:
         id_limpo = id_acao.strip()
+        erro_validacao = False
         
-        # Validações estruturadas lineares (Elimina o problema de recuo do else)
         if id_limpo != "" and not id_limpo.isdigit():
             st.error("Erro: O ID da Ação precisa ser um número inteiro válido (ex: 1, 5, 12).")
+            erro_validacao = True
         elif not descricao:
             st.error("A descrição (O que) é obrigatória.")
-        else:
+            erro_validacao = True
+            
+        if not erro_validacao:
             id_resp = str(dict_usuarios.get(nome_resp)) if (not modo_responsavel_manual and dict_usuarios) else responsavel_manual_id.strip()
             
             url_doc = None
@@ -244,6 +248,3 @@ with st.form("form_acao", clear_on_submit=True):
             
             try:
                 supabase = get_supabase_client()
-                if id_limpo != "":
-                    supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
-                else:
