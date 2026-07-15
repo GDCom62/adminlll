@@ -246,3 +246,60 @@ with st.form("form_acao", clear_on_submit=True):
                 if id_limpo != "":
                     supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
                 else:
+# ==============================================================================
+# TABELA DE VISUALIZAÇÃO E AÇÕES (EDITAR / EXCLUIR)
+# ==============================================================================
+st.write("---")
+st.subheader("📋 Ações Registradas")
+
+if acoes:
+    # Converter dados para DataFrame para exibição limpa
+    df_exibicao = pd.DataFrame(acoes)
+    
+    # Reorganizar e renomear colunas para o usuário
+    colunas_existentes = df_exibicao.columns
+    colunas_desejadas = ['id_acao', 'descricao_acao', 'prazo', 'status', 'porque', 'onde', 'como']
+    colunas_finais = [c for c in colunas_desejadas if c in colunas_existentes]
+    
+    df_filtrado = df_exibicao[colunas_finais].copy()
+    
+    # Criar o gerador de PDF
+    try:
+        pdf_data = gerar_pdf_atualizado(acoes)
+        st.download_button(
+            label="📄 Baixar Plano de Ação em PDF",
+            data=pdf_data,
+            file_name=f"plano_de_acao_{datetime.now().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+        )
+    except Exception as e:
+        st.sidebar.error(f"Erro ao gerar botão do PDF: {e}")
+
+    # Renderizar linhas com botões individuais usando loops de colunas do Streamlit
+    for index, row in df_filtrado.iterrows():
+        id_atual = row['id_acao']
+        
+        # Cria um container visual para cada linha de ação
+        with st.container(border=True):
+            c_dados, c_edit, c_excluir = st.columns([8, 1, 1])
+            
+            with c_dados:
+                st.markdown(f"**ID: {id_atual}** | **O que:** {row.get('descricao_acao', '')}")
+                st.caption(f"📅 **Prazo:** {row.get('prazo', '')} | 📊 **Status:** {row.get('status', '')} | 🎯 **Por que:** {row.get('porque', '')}")
+            
+            with c_edit:
+                # Botão de editar joga o ID no formulário do topo (instrução visual)
+                if st.button("✏️", key=f"btn_edit_{id_atual}", help="Editar esta ação"):
+                    st.info(f"Suba até o formulário e digite o ID **{id_atual}** para modificar os dados.")
+            
+            with c_excluir:
+                if st.button("🗑️", key=f"btn_del_{id_atual}", help="Excluir esta ação"):
+                    try:
+                        supabase = get_supabase_client()
+                        supabase.table("Acoes").delete().eq("id_acao", id_atual).execute()
+                        st.toast(f"Ação {id_atual} excluída com sucesso!", icon="🗑️")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao deletar: {e}")
+else:
+    st.info("Nenhuma ação cadastrada no momento.")
