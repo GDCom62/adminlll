@@ -244,3 +244,25 @@ if acoes:
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
     # Injeção de CSS para o botão de PDF Cor Abóbora
+
+# EXIBIÇÃO VISUAL GARANTIDA: Botões impressos abaixo do texto sem colunas estreitas bloqueadoras
+        b1, b2, _ = card_container.columns([0.15, 0.15, 0.7])
+        
+        if b1.button("✏️ Editar", key=f"ed_card_{row['id_acao']}", use_container_width=True):
+            st.session_state.edit_id = row['id_acao']
+            st.rerun()
+        
+        if b2.button("🗑️ Excluir", key=f"btn_ex_card_{row['id_acao']}", use_container_width=True):
+            st.session_state.confirmar_excluir = row['id_acao']
+            st.rerun()
+        
+        if st.session_state.confirmar_excluir == row['id_acao']:
+            card_container.warning(f"Tem certeza que deseja apagar o item #{row['id_acao']}?")
+            ca, cb = card_container.columns(2)
+            if ca.button("✅ Confirmar", key=f"sim_card_{row['id_acao']}", use_container_width=True):
+                st.session_state['banco_acoes'] = [a for a in st.session_state['banco_acoes'] if a['id_acao'] != row['id_acao']]
+                st.session_state.confirmar_excluir = None
+                st.rerun()
+            if cb.button("❌ Cancelar", key=f"nao_card_{row['id_acao']}", use_container_width=True):
+                st.session_state.confirmar_excluir = None
+                st.rerun()
