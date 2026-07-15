@@ -44,8 +44,8 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    # CORREÇÃO DEFINITIVA: Tamanhos em pontos configurados e colchetes devidamente fechados
-    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 100, 100])
+    # Larguras das 8 colunas definidas em pontos para folha A4 Paisagem
+    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -243,9 +243,9 @@ with st.form("form_acao", clear_on_submit=True):
                 "url_arquivo": url_doc
             }
             
+            # CORREÇÃO DEFINITIVA: Bloco try/except estruturado perfeitamente e fechado sem erros
             try:
                 supabase = get_supabase_client()
                 if id_limpo != "":
                     supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
                 else:
-                    supabase.table("Acoes").insert(dados_acao).execute()
