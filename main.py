@@ -10,7 +10,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
+SUPABASE_URL = "https://supabase.co" 
 SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
 def get_supabase_client() -> Client:
@@ -59,6 +59,12 @@ def gerar_pdf_atualizado(dados_acoes):
 # Inicializa os estados de sessão de forma segura no topo
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
+
+# Estado para armazenar dados da ação selecionada para edição
+if 'id_edicao' not in st.session_state:
+    st.session_state['id_edicao'] = ""
+if 'valores_edicao' not in st.session_state:
+    st.session_state['valores_edicao'] = {}
 
 # Função para fazer upload de arquivos no Storage do Supabase
 def fazer_upload_storage(arquivo_upload):
@@ -190,116 +196,51 @@ if total_acoes > 0:
 st.write("---")
 st.subheader("Nova Ação / Editar Ação")
 
-with st.form("form_acao", clear_on_submit=True):
-    st.info("💡 Para criar um novo item, deixe o ID da Ação vazio. Para editar, digite o número do ID correspondente.")
-    id_acao = st.text_input("ID da Ação (Somente números para editar)")
-    descricao = st.text_input("O que (Ação) *")
-    porque = st.text_input("Por que")
-    onde = st.text_input("Onde")
+# Resgata valores se estiver no modo de edição para preencher o formulário automaticamente
+v_edicao = st.session_state['valores_edicao']
+
+with st.form("form_acao", clear_on_submit=False):
+    st.info("💡 Para criar um novo item, deixe o ID vazio. Para editar, clique no botão ✏️ de alguma ação abaixo.")
+    
+    id_acao = st.text_input("ID da Ação (Preenchido automaticamente ao editar)", value=st.session_state['id_edicao'], disabled=True)
+    descricao = st.text_input("O que (Ação) *", value=v_edicao.get('descricao_acao', ''))
+    porque = st.text_input("Por que", value=v_edicao.get('porque', ''))
+    onde = st.text_input("Onde", value=v_edicao.get('onde', ''))
     
     dict_usuarios = {}
+    index_usuario = 0
     if not modo_responsavel_manual and usuarios:
-        for u in usuarios:
-            dict_usuarios[u.get('nome', 'Sem Nome')] = u.get('id_usuario', '1')
-        nome_resp = st.selectbox("Responsável (Quem) *", list(dict_usuarios.keys()))
+        lista_nomes = []
+        for i, u in enumerate(usuarios):
+            nome_u = u.get('nome', 'Sem Nome')
+            dict_usuarios[nome_u] = u.get('id_usuario', '1')
+            lista_nomes.append(nome_u)
+            if str(u.get('id_usuario')) == str(v_edicao.get('id_usuario')):
+                index_usuario = i
+        nome_resp = st.selectbox("Responsável (Quem) *", lista_nomes, index=index_usuario)
     else:
-        responsavel_manual_id = st.text_input("Código do Responsável (Digite o ID numérico ou Nome do responsável) *", value="1")
+        responsavel_manual_id = st.text_input("Código do Responsável (Digite o ID numérico ou Nome) *", value=str(v_edicao.get('id_usuario', '1')))
     
-    # CORREÇÃO CRÍTICA: Parêntese fechado corretamente na função date()
-    prazo = st.date_input("Prazo *", value=datetime.now().date())
-    como = st.text_input("Como")
-    quando_detalhe = st.text_input("Permanência (Detalhe)")
-    status = st.selectbox("Status", ["Não Iniciado", "Em Andamento", "Concluído"])
-    arquivo_evidencia = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
+    # CORREÇÃO DA LINHA 178: Data padrão ou data recuperada da edição
+    data_padrao = hoje
+    if v_edicao.get('prazo'):
+        try:
+            data_padrao = pd.to_datetime(v_edicao.get('prazo')).date()
+        except:
+            pass
+            
+    prazo = st.date_input("Prazo final (Quando)", value=data_padrao)
+    como = st.text_input("Como", value=v_edicao.get('como', ''))
+    quando_detalhe = st.text_input("Quando (Detalhes adicionais)", value=v_edicao.get('quando_detalhe', ''))
     
-    submit = st.form_submit_button("Salvar Ação")
-    
-    if submit:
-        id_limpo = id_acao.strip()
-        erro_validacao = False
+    # Define index do Status na edição
+    lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
+    index_status = 0
+    if v_edicao.get('status') in lista_status:
+        index_status = lista_status.index(v_edicao.get('status'))
         
-        if id_limpo != "" and not id_limpo.isdigit():
-            st.error("Erro: O ID da Ação precisa ser um número inteiro válido (ex: 1, 5, 12).")
-            erro_validacao = True
-        elif not descricao:
-            st.error("A descrição (O que) é obrigatória.")
-            erro_validacao = True
-            
-        if not erro_validacao:
-            id_resp = str(dict_usuarios.get(nome_resp)) if (not modo_responsavel_manual and dict_usuarios) else responsavel_manual_id.strip()
-            url_doc = fazer_upload_storage(arquivo_evidencia) if arquivo_evidencia else None
-            
-            dados_acao = {
-                "descricao_acao": descricao,
-                "porque": porque,
-                "onde": onde,
-                "id_responsavel": id_resp,
-                "prazo": prazo.strftime('%Y-%m-%d'),
-                "como": como,
-                "quando_detalhe": quando_detalhe,
-                "status": status,
-                "url_arquivo": url_doc
-            }
-            
-            try:
-                supabase = get_supabase_client()
-                if id_limpo != "":
-                    supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
-                else:
-# ==============================================================================
-# TABELA DE VISUALIZAÇÃO E AÇÕES (EDITAR / EXCLUIR)
-# ==============================================================================
-st.write("---")
-st.subheader("📋 Ações Registradas")
-
-if acoes:
-    # Converter dados para DataFrame para exibição limpa
-    df_exibicao = pd.DataFrame(acoes)
+    status = st.selectbox("Status", lista_status, index=index_status)
+    arquivo_anexo = st.file_uploader("Anexar arquivo/evidência", type=["pdf", "png", "jpg", "xlsx", "docx"])
     
-    # Reorganizar e renomear colunas para o usuário
-    colunas_existentes = df_exibicao.columns
-    colunas_desejadas = ['id_acao', 'descricao_acao', 'prazo', 'status', 'porque', 'onde', 'como']
-    colunas_finais = [c for c in colunas_desejadas if c in colunas_existentes]
-    
-    df_filtrado = df_exibicao[colunas_finais].copy()
-    
-    # Criar o gerador de PDF
-    try:
-        pdf_data = gerar_pdf_atualizado(acoes)
-        st.download_button(
-            label="📄 Baixar Plano de Ação em PDF",
-            data=pdf_data,
-            file_name=f"plano_de_acao_{datetime.now().strftime('%Y%m%d')}.pdf",
-            mime="application/pdf",
-        )
-    except Exception as e:
-        st.sidebar.error(f"Erro ao gerar botão do PDF: {e}")
-
-    # Renderizar linhas com botões individuais usando loops de colunas do Streamlit
-    for index, row in df_filtrado.iterrows():
-        id_atual = row['id_acao']
-        
-        # Cria um container visual para cada linha de ação
-        with st.container(border=True):
-            c_dados, c_edit, c_excluir = st.columns([8, 1, 1])
-            
-            with c_dados:
-                st.markdown(f"**ID: {id_atual}** | **O que:** {row.get('descricao_acao', '')}")
-                st.caption(f"📅 **Prazo:** {row.get('prazo', '')} | 📊 **Status:** {row.get('status', '')} | 🎯 **Por que:** {row.get('porque', '')}")
-            
-            with c_edit:
-                # Botão de editar joga o ID no formulário do topo (instrução visual)
-                if st.button("✏️", key=f"btn_edit_{id_atual}", help="Editar esta ação"):
-                    st.info(f"Suba até o formulário e digite o ID **{id_atual}** para modificar os dados.")
-            
-            with c_excluir:
-                if st.button("🗑️", key=f"btn_del_{id_atual}", help="Excluir esta ação"):
-                    try:
-                        supabase = get_supabase_client()
-                        supabase.table("Acoes").delete().eq("id_acao", id_atual).execute()
-                        st.toast(f"Ação {id_atual} excluída com sucesso!", icon="🗑️")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao deletar: {e}")
-else:
-    st.info("Nenhuma ação cadastrada no momento.")
+    c_btn1, c_btn2 = st.columns(2)
+    with c_btn1:
