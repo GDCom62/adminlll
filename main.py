@@ -45,7 +45,7 @@ def gerar_pdf_atualizado(dados_acoes):
         ])
 
     # Definição de larguras fixas em pontos para as 8 colunas na folha horizontal
-    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 100, 120])
+    t = Table(dados_pdf, colWidths=[40, 150, 70, 70, 100, 80, 120, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -218,6 +218,7 @@ with st.form("form_acao", clear_on_submit=True):
     if submit:
         id_limpo = id_acao.strip()
         
+        # Validações estruturadas lineares (Elimina o problema de recuo do else)
         if id_limpo != "" and not id_limpo.isdigit():
             st.error("Erro: O ID da Ação precisa ser um número inteiro válido (ex: 1, 5, 12).")
         elif not descricao:
@@ -241,7 +242,6 @@ with st.form("form_acao", clear_on_submit=True):
                 "url_arquivo": url_doc
             }
             
-            # CORREÇÃO CRÍTICA DE INDENTAÇÃO: Todo o bloco try/except alinhado corretamente debaixo do if/else
             try:
                 supabase = get_supabase_client()
                 if id_limpo != "":
