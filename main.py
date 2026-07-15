@@ -44,7 +44,8 @@ def gerar_pdf_atualizado(dados_acoes):
             str(a.get('quando_detalhe', ''))
         ])
 
-    t = Table(dados_pdf, colWidths=[40, 150, 60, 70, 100, 80, 100, 120])
+    # CORREÇÃO DEFINITIVA: Tamanhos em pontos configurados e colchetes devidamente fechados
+    t = Table(dados_pdf, colWidths=[40, 150, 70, 80, 100, 80, 100, 100])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.navy),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -114,7 +115,7 @@ with col_log:
         st.session_state['logado'] = False
         st.rerun()
 
-# 1. Buscar Ações de forma direta no Supabase
+# Buscar Ações de forma direta no Supabase
 acoes = []
 usuarios = []
 try:
@@ -124,14 +125,13 @@ try:
 except Exception as e:
     st.error(f"Erro ao carregar dados do Supabase (Tabela Acoes): {e}")
 
-# 2. Tentar buscar usuários de forma segura (Se falhar, ativa o modo de texto manual)
+# Tentar buscar usuários de forma segura (Se falhar, ativa o modo de texto manual)
 modo_responsavel_manual = False
 try:
     supabase = get_supabase_client()
     resposta_usuarios = supabase.table("usuarios").select("*").execute()
     usuarios = resposta_usuarios.data if hasattr(resposta_usuarios, "data") else []
 except Exception:
-    # Se der erro PGRST205 (tabela faltante), o aplicativo ativa o plano B automaticamente
     modo_responsavel_manual = True
 
 # --- INDICADORES GRÁFICOS E METRICAS ---
@@ -199,14 +199,12 @@ with st.form("form_acao", clear_on_submit=True):
     porque = st.text_input("Por que")
     onde = st.text_input("Onde")
     
-    # Gerencia a exibição do campo de responsável baseado no banco
     dict_usuarios = {}
     if not modo_responsavel_manual and usuarios:
         for u in usuarios:
             dict_usuarios[u.get('nome', 'Sem Nome')] = u.get('id_usuario', '1')
         nome_resp = st.selectbox("Responsável (Quem) *", list(dict_usuarios.keys()))
     else:
-        # PLANO B: Se a tabela usuários não existir, vira um campo de texto simples estável
         responsavel_manual_id = st.text_input("Código do Responsável (Digite o ID numérico ou Nome do responsável) *", value="1")
     
     prazo = st.date_input("Prazo *", value=datetime.now().date())
@@ -224,7 +222,6 @@ with st.form("form_acao", clear_on_submit=True):
         elif not descricao:
             st.error("A descrição (O que) é obrigatória.")
         else:
-            # Captura o ID correto do responsável dependendo do modo ativo
             if not modo_responsavel_manual and dict_usuarios:
                 id_resp = str(dict_usuarios.get(nome_resp))
             else:
@@ -248,3 +245,7 @@ with st.form("form_acao", clear_on_submit=True):
             
             try:
                 supabase = get_supabase_client()
+                if id_limpo != "":
+                    supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
+                else:
+                    supabase.table("Acoes").insert(dados_acao).execute()
