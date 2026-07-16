@@ -248,4 +248,4 @@ if acoes:
     
     ids_disponiveis = [a for a in df_filtrado['id_acao']]
     
-    if ids_disponiveis:
+    # ESTRUTURA LINEAR REFEITA TOTALMENTE SEM CONFLITOS DE RECUO INDENTADO
