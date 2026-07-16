@@ -276,6 +276,111 @@ status_selecionado = st.selectbox("Status", lista_status, index=lista_status.ind
 
 arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
 
+# --- INDICADORES GRÁFICOS E METRICAS ---
+st.write("---")
+st.subheader("📊 Painel de Monitoramento Geral")
+
+total_acoes = len(acoes)
+concluidas = 0
+atrasadas = 0
+hoje = pd.Timestamp.now().date()
+status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
+
+if acoes:
+    for a in acoes:
+        status_texto = str(a.get('status', 'Não Iniciado')).strip().title()
+        
+        if "Andamento" in status_texto:
+            status_contagem["Em Andamento"] += 1
+        elif "Concluído" in status_texto or "Concluido" in status_texto:
+            status_contagem["Concluído"] += 1
+            concluidas += 1
+        else:
+            status_contagem["Não Iniciado"] += 1
+            
+        try:
+            data_prazo = pd.to_datetime(a.get('prazo')).date()
+            if data_prazo < hoje and "Concluid" not in status_texto:
+                atrasadas += 1
+        except:
+            pass
+
+taxa_conclusao = (concluidas / total_acoes * 100) if total_acoes > 0 else 0.0
+
+m1, m2, m3 = st.columns(3)
+with m1:
+    st.metric(label="📋 Total de Ações Registradas", value=f"{total_acoes} itens")
+with m2:
+    st.metric(label="✅ Taxa de Conclusão", value=f"{taxa_conclusao:.1f}%")
+with m3:
+    if atrasadas > 0:
+        st.metric(label="🚨 Ações Críticas (Atrasadas)", value=f"{atrasadas} pendentes", delta="- Atenção urgente", delta_color="inverse")
+    else:
+        st.metric(label="🛡️ Prazos sob Controle", value="0 atrasos", delta="Em dia")
+
+st.write("<br>", unsafe_allow_html=True)
+
+# Gráfico Seguro usando Plotly Express (Substitui color_config inválido)
+st.write("📊 **Progresso dos Planos de Ação**")
+
+dados_barras = {
+    "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
+    "Quantidade": [status_contagem["Não Iniciado"], status_contagem["Em Andamento"], status_contagem["Concluído"]]
+}
+df_barras_limpo = pd.DataFrame(dados_barras)
+
+if df_barras_limpo["Quantidade"].sum() > 0:
+    fig = px.bar(
+        df_barras_limpo, 
+        x="Status", 
+        y="Quantidade", 
+        color="Status",
+        color_discrete_map={"Não Iniciado": "#ff9999", "Em Andamento": "#66b3ff", "Concluído": "#99ff99"}
+    )
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("💡 Cadastre ações para visualizar o gráfico de barras de monitoramento.")
+
+# --- LISTAGEM DOS ITENS SALVOS ---
+st.write("---")
+st.subheader("📋 Ações Registradas")
+
+if acoes:
+    df_tabela = pd.DataFrame(acoes)
+    colunas_necessarias = ["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]
+    for col in colunas_necessarias:
+        if col not in df_tabela.columns:
+            df_tabela[col] = ""
+            
+    df_tabela = df_tabela[colunas_necessarias]
+    df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
+    st.dataframe(df_tabela, use_container_width=True, hide_index=True)
+    
+    st.write("**Ações de Gerenciamento:**")
+    col_sel, col_btn_ed, col_btn_ex = st.columns(3)
+    
+    with col_sel:
+        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_manutencao")
+    
+    with col_btn_ed:
+        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item"):
+            item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
+            if item_procurado:
+                st.session_state['edit_item'] = item_procurado
+                st.rerun()
+                
+    with col_btn_ex:
+        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item"):
+            try:
+                supabase = get_supabase_client()
+                supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
+                st.success(f"Ação ID #{id_selecionado} excluída!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao excluir: {e}")
+else:
+    st.info("Nenhuma ação cadastrada no sistema até o momento.")
+    
 # --- LÓGICA INTELIGENTE DE BOTÕES (SALVAR VS ATUALIZAR) ---
 if st.session_state['edit_item']:
     # Se você clicou em editar, aparecem os botões de controle de alteração
