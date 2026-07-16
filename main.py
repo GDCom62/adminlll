@@ -180,7 +180,7 @@ if acoes:
     st.download_button(
         label="🟢 Baixar Lista Filtrada em Excel (.xlsx)",
         data=buffer_excel.getvalue(),
-        file_name=f"plano_de_acao_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+        file_name=f"plano_de_acao_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key="btn_download_excel_unico"
     )
