@@ -245,7 +245,6 @@ if acoes:
     st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
     
     st.write("**Ações de Gerenciamento:**")
-    col_btn_ed, col_btn_ex = st.columns(2)
     
     ids_disponiveis = [a for a in df_filtrado['id_acao']]
     
