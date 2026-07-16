@@ -200,53 +200,119 @@ if df_barras_limpo["Quantidade"].sum() > 0:
 else:
     st.info("💡 Cadastre ações para visualizar o gráfico de barras de monitoramento.")
 
-# --- LISTAGEM DOS ITENS SALVOS COM FILTROS E EXCEL ---
+# --- LISTAGEM DOS ITENS SALVOS ---
 st.write("---")
 st.subheader("📋 Ações Registradas")
 
 if acoes:
-    df_base = pd.DataFrame(acoes)
+    df_tabela = pd.DataFrame(acoes)
     colunas_necessarias = ["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]
     for col in colunas_necessarias:
-        if col not in df_base.columns:
-            df_base[col] = ""
-
-    st.markdown("🔍 **Filtros de Busca**")
-    f_col1, f_col2 = st.columns(2)
-    
-    with f_col1:
-        opcoes_status = ["Todos"] + sorted(list(df_base["status"].unique()))
-        status_filtrado = st.selectbox("Filtrar por Status:", opcoes_status, key="filtro_status_dinamico")
-        
-    with f_col2:
-        opcoes_resp = ["Todos"] + sorted(list(df_base["id_responsavel"].astype(str).unique()))
-        resp_filtrado = st.selectbox("Filtrar por ID do Responsável:", opcoes_resp, key="filtro_resp_dinamico")
-
-    df_filtrado = df_base.copy()
-    if status_filtrado != "Todos":
-        df_filtrado = df_filtrado[df_filtrado["status"] == status_filtrado]
-    if resp_filtrado != "Todos":
-        df_filtrado = df_filtrado[df_filtrado["id_responsavel"].astype(str) == resp_filtrado]
-
-    buffer_excel = io.BytesIO()
-    with pd.ExcelWriter(buffer_excel, engine='openpyxl') as writer:
-        df_filtrado[colunas_necessarias].to_excel(writer, index=False, sheet_name='Planos de Ação')
-    
-    st.download_button(
-        label="🟢 Baixar Lista Filtrada em Excel (.xlsx)",
-        data=buffer_excel.getvalue(),
-        file_name=f"plano_de_acao_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key="btn_download_excel_unico"
-    )
-    st.write("<br>", unsafe_allow_html=True)
-
-    df_exibicao = df_filtrado[colunas_necessarias].copy()
-    df_exibicao.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
-    st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
+        if col not in df_tabela.columns:
+            df_tabela[col] = ""
+            
+    df_tabela = df_tabela[colunas_necessarias]
+    df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
+    st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
     st.write("**Ações de Gerenciamento:**")
+    col_sel, col_btn_ed, col_btn_ex = st.columns(3)
     
-    ids_disponiveis = [a for a in df_filtrado['id_acao']]
+    with col_sel:
+        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_gerenciamento_definitivo")
     
-    # ESTRUTURA LINEAR REFEITA TOTALMENTE SEM CONFLITOS DE RECUO INDENTADO
+    with col_btn_ed:
+        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item_definitivo"):
+            item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
+            if item_procurado:
+                st.session_state['edit_item'] = item_procurado
+                st.rerun()
+                
+    with col_btn_ex:
+        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item_definitivo"):
+            try:
+                supabase = get_supabase_client()
+                supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
+                st.success(f"Ação ID #{id_selecionado} excluída!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao excluir: {e}")
+else:
+    st.info("Nenhuma ação cadastrada no sistema até o momento.")
+
+# --- PAINEL OPERACIONAL (ATUALIZADO COM FLUXO DE EDIÇÃO CORRETO) ---
+st.write("---")
+st.subheader("📝 Painel: Registrar Informações")
+
+id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
+descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
+porque = st.text_input("Por que", value=valores_padrao["porque"])
+onde = st.text_input("Onde", value=valores_padrao["onde"])
+responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"])
+
+prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
+prazo = st.date_input("Prazo *", value=prazo_val)
+
+como = st.text_input("Como", value=valores_padrao["como"])
+quando_detalhe = str(st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"]))
+
+lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
+status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0)
+
+arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
+
+# --- LÓGICA INTELIGENTE DE BOTÕES (SALVAR VS ATUALIZAR) ---
+if st.session_state['edit_item']:
+    # Se você clicou em editar, aparecem os botões de controle de alteração
+    col_salvar, col_cancelar = st.columns(2)
+    
+    with col_salvar:
+        btn_atualizar = st.button("🔄 Confirmar e Salvar Alterações", use_container_width=True, type="primary")
+    with col_cancelar:
+        btn_cancelar = st.button("❌ Cancelar Edição (Voltar ao Novo)", use_container_width=True)
+        
+    if btn_cancelar:
+        st.session_state['edit_item'] = None
+        st.rerun()
+        
+    if btn_atualizar:
+        if not descricao:
+            st.error("O campo 'Descrição (O que)' é obrigatório.")
+        else:
+            url_doc = valores_padrao["url_arquivo"]
+            if arquivo_enviado:
+                url_doc = fazer_upload_storage(arquivo_enviado)
+                
+            # Envia o ID para a função fazer o UPDATE no Supabase
+            sucesso, msg = salvar_acao_no_banco(
+                id_acao, descricao, porque, onde, responsavel_id_input, 
+                str(prazo), como, quando_detalhe, status_selecionado, url_doc
+            )
+            if sucesso:
+                st.success("Alterações salvas com sucesso!")
+                st.session_state['edit_item'] = None  # Sai do modo edição
+                st.rerun()
+                
+else:
+    # Se você NÃO está editando, exibe o botão padrão de novo cadastro
+    if st.button("💾 Salvar Novo Cadastro", use_container_width=True, type="primary"):
+        if not descricao:
+            st.error("O campo 'Descrição (O que)' é obrigatório.")
+        else:
+            url_doc = None
+            if arquivo_enviado:
+                url_doc = fazer_upload_storage(arquivo_enviado)
+                
+            # Como ID vai vazio, a função faz um INSERT automático no Supabase
+            sucesso, msg = salvar_acao_no_banco(
+                "", descricao, porque, onde, responsavel_id_input, 
+                str(prazo), como, quando_detalhe, status_selecionado, url_doc
+            )
+            if sucesso:
+                st.success("Nova ação cadastrada com sucesso!")
+                st.rerun()
+if st.session_state['edit_item']:
+    st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
+
+# Chaves totalmente únicas usando o prefixo "reg_" para evitar colisões
+id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="reg_id")
