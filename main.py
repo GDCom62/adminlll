@@ -10,8 +10,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Lembre-se de preencher com a URL e KEY corretas do seu projeto
-SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
+SUPABASE_URL = "https://supabase.co" 
 SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
 def get_supabase_client() -> Client:
@@ -218,7 +217,6 @@ if acoes:
     col_sel, col_btn_ed, col_btn_ex = st.columns(3)
     
     with col_sel:
-        # CHAVE ÚNICA ATRIBUÍDA PARA COMPORTAMENTO SEGURO
         id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_gerenciamento_unico")
     
     with col_btn_ed:
@@ -240,12 +238,12 @@ if acoes:
 else:
     st.info("Nenhuma ação cadastrada no sistema até o momento.")
 
-# --- PAINEL OPERACIONAL ---
+# --- PAINEL OPERACIONAL DE CADASTRO E EDIÇÃO CORRIGIDO ---
 st.write("---")
 st.subheader("📝 Painel: Registrar Informações")
 
 if st.session_state['edit_item']:
     st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
 
-id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
-descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
+# Agrupando os campos visuais em um bloco limpo
+id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id_painel")
