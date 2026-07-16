@@ -10,8 +10,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Lembre-se de preencher com a URL e KEY corretas do seu projeto
-SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
+SUPABASE_URL = "https://supabase.co" 
 SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
 def get_supabase_client() -> Client:
@@ -122,15 +121,15 @@ valores_padrao = {
 if st.session_state['edit_item']:
     item = st.session_state['edit_item']
     valores_padrao = {
-        "id": str(item['id_acao']),
-        "descricao": str(item['descricao_acao']),
-        "porque": str(item['porque']) if item['porque'] else "",
-        "onde": str(item['onde']) if item['onde'] else "",
-        "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
-        "como": str(item['como']) if item['como'] else "",
-        "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
-        "status": str(item['status']),
-        "prazo": item['prazo'],
+        "id": str(item.get('id_acao', '')),
+        "descricao": str(item.get('descricao_acao', '')),
+        "porque": str(item.get('porque', '')) if item.get('porque') else "",
+        "onde": str(item.get('onde', '')) if item.get('onde') else "",
+        "id_responsavel": str(item.get('id_responsavel', '1')) if item.get('id_responsavel') else "1",
+        "como": str(item.get('como', '')) if item.get('como') else "",
+        "quando_detalhe": str(item.get('quando_detalhe', '')) if item.get('quando_detalhe') else "",
+        "status": str(item.get('status', 'Não Iniciado')),
+        "prazo": item.get('prazo'),
         "url_arquivo": item.get('url_arquivo')
     }
 
@@ -218,17 +217,17 @@ if acoes:
     col_sel, col_btn_ed, col_btn_ex = st.columns(3)
     
     with col_sel:
-        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_gerenciamento_unico")
+        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_gerenciamento_definitivo")
     
     with col_btn_ed:
-        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item"):
+        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item_definitivo"):
             item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
             if item_procurado:
                 st.session_state['edit_item'] = item_procurado
                 st.rerun()
                 
     with col_btn_ex:
-        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item"):
+        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item_definitivo"):
             try:
                 supabase = get_supabase_client()
                 supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
@@ -239,13 +238,12 @@ if acoes:
 else:
     st.info("Nenhuma ação cadastrada no sistema até o momento.")
 
-# --- PAINEL OPERACIONAL DE CADASTRO E EDIÇÃO TOTALMENTE REESTRUTURADO ---
+# --- PAINEL OPERACIONAL ISOLADO (SEM CHANCES DE TRAVAMENTO DE CHAVES) ---
 st.write("---")
 st.subheader("📝 Painel: Registrar Informações")
 
 if st.session_state['edit_item']:
     st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
 
-# Removidos os formulários internos "st.form" redundantes para evitar travamento de chaves
-id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="p_id")
-descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"], key="p_desc")
+# Chaves totalmente únicas usando o prefixo "reg_" para evitar colisões
+id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="reg_id")
