@@ -137,18 +137,43 @@ if st.session_state['edit_item']:
 
 # --- INDICADORES GRÁFICOS E METRICAS ---
 # --- LISTAGEM DOS ITENS SALVOS COM FILTROS E EXCEL ---
-st.write("---")
-st.subheader("📋 Ações Registradas")
+# --- RECONSTRUÇÃO DO GRÁFICO AUTOMATIZADO ---
+st.write("📊 **Progresso dos Planos de Ação**")
+
+# Recalcula a contagem exata para garantir que o gráfico seja desenhado
+status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
 
 if acoes:
-    # Criamos o DataFrame base com todas as ações do banco
-    df_base = pd.DataFrame(acoes)
-    
-    # Garantimos que as colunas existam para evitar erros de leitura
-    colunas_necessarias = ["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]
-    for col in colunas_necessarias:
-        if col not in df_base.columns:
-            df_base[col] = ""
+    for a in acoes:
+        status_texto = str(a.get('status', 'Não Iniciado')).strip().title()
+        if "Andamento" in status_texto:
+            status_contagem["Em Andamento"] += 1
+        elif "Concluído" in status_texto or "Concluido" in status_texto:
+            status_contagem["Concluído"] += 1
+        else:
+            status_contagem["Não Iniciado"] += 1
+
+# Monta a tabela do gráfico com os valores limpos
+dados_barras = {
+    "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
+    "Quantidade": [status_contagem["Não Iniciado"], status_contagem["Em Andamento"], status_contagem["Concluído"]]
+}
+df_barras_limpo = pd.DataFrame(dados_barras)
+
+# Renderiza o gráfico usando o Plotly Express que já está configurado no seu app
+if df_barras_limpo["Quantidade"].sum() > 0:
+    fig = px.bar(
+        df_barras_limpo, 
+        x="Status", 
+        y="Quantidade", 
+        color="Status",
+        color_discrete_map={"Não Iniciado": "#ff9999", "Em Andamento": "#66b3ff", "Concluído": "#99ff99"}
+    )
+    # Remove legendas redundantes para o visual ficar mais limpo
+    fig.update_layout(showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("💡 Cadastre ações no sistema para visualizar o gráfico de monitoramento.")
 
     # --- BARRA DE FILTROS DINÂMICOS ---
     st.markdown("🔍 **Filtros de Busca**")
