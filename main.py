@@ -10,7 +10,8 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-SUPABASE_URL = "https://supabase.co" 
+# Lembre-se de preencher com a URL e KEY corretas do seu projeto
+SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
 SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
 def get_supabase_client() -> Client:
@@ -53,7 +54,7 @@ def salvar_acao_no_banco(id_limpo, descricao, v_porque, v_onde, id_resp_final, p
             "url_arquivo": url_arq
         }
         
-        if id_limpo and str(id_limpo).isdigit():
+        if id_limpo and id_limpo.isdigit():
             supabase.table("Acoes").update(dados_acao).eq("id_acao", int(id_limpo)).execute()
         else:
             supabase.table("Acoes").insert(dados_acao).execute()
@@ -74,6 +75,7 @@ if not st.session_state['logado']:
             
         st.markdown("<h2 style='text-align: center;'>Acesso ao Sistema</h2>", unsafe_allow_html=True)
         
+        # O uso de st.form impede que a nuvem limpe a sessão antes da validação
         with st.form(key="formulario_login"):
             usuario_input = st.text_input("Usuário")
             senha_input = st.text_input("Senha", type="password")
@@ -108,53 +110,30 @@ acoes = []
 try:
     supabase = get_supabase_client()
     resposta = supabase.table("Acoes").select("*").order("prazo", desc=False).execute()
-    acoes = resposta.data if hasattr(resposta, "data") else resposta.get('data', [])
+    acoes = resposta.data
 except Exception as e:
     st.error(f"Erro ao carregar dados do Supabase: {e}")
 
-# --- CONFIGURAÇÃO DE VALORES PADRÃO (MOVIDO PARA CIMA PARA EVITAR ERROS) ---
-valores_padrao = {
-    "id": "", "descricao": "", "porque": "", "onde": "", 
-    "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
-}
+    # --- INDICADORES GRÁFICOS E METRICAS TURBINADAS ---
+    st.write("---")
+    st.subheader("📊 Painel de Monitoramento Geral")
 
-if st.session_state['edit_item']:
-    item = st.session_state['edit_item']
-    valores_padrao = {
-        "id": str(item['id_acao']),
-        "descricao": str(item['descricao_acao']),
-        "porque": str(item['porque']) if item['porque'] else "",
-        "onde": str(item['onde']) if item['onde'] else "",
-        "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
-        "como": str(item['como']) if item['como'] else "",
-        "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
-        "status": str(item['status']),
-        "prazo": item['prazo'],
-        "url_arquivo": item.get('url_arquivo')
-    }
+    # Cálculos para os cartões de métricas
+    total_acoes = len(acoes_filtradas)
+    concluidas = 0
+    atrasadas = 0
+    hoje = pd.Timestamp.now().date()
 
-# --- INDICADORES GRÁFICOS E METRICAS ---
-st.write("---")
-st.subheader("📊 Painel de Monitoramento Geral")
-
-total_acoes = len(acoes)
-concluidas = 0
-atrasadas = 0
-hoje = pd.Timestamp.now().date()
-status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
-
-if acoes:
-    for a in acoes:
+    lista_status_banco = []
+    for a in acoes_filtradas:
         status_texto = str(a.get('status', 'Não Iniciado')).strip().title()
+        lista_status_banco.append(status_texto)
         
-        if "Andamento" in status_texto:
-            status_contagem["Em Andamento"] += 1
-        elif "Concluído" in status_texto or "Concluido" in status_texto:
-            status_contagem["Concluído"] += 1
+        # Contabiliza concluídas
+        if "Concluído" in status_texto or "Concluido" in status_texto:
             concluidas += 1
-        else:
-            status_contagem["Não Iniciado"] += 1
             
+        # Contabiliza atrasadas (prazo menor que hoje e não concluída)
         try:
             data_prazo = pd.to_datetime(a.get('prazo')).date()
             if data_prazo < hoje and "Concluid" not in status_texto:
@@ -162,41 +141,55 @@ if acoes:
         except:
             pass
 
-taxa_conclusao = (concluidas / total_acoes * 100) if total_acoes > 0 else 0.0
+    # Calcula a taxa de eficiência em porcentagem
+    taxa_conclusao = (concluidas / total_acoes * 100) if total_acoes > 0 else 0.0
 
-m1, m2, m3 = st.columns(3)
-with m1:
-    st.metric(label="📋 Total de Ações Registradas", value=f"{total_acoes} itens")
-with m2:
-    st.metric(label="✅ Taxa de Conclusão", value=f"{taxa_conclusao:.1f}%")
-with m3:
-    if atrasadas > 0:
-        st.metric(label="🚨 Ações Críticas (Atrasadas)", value=f"{atrasadas} pendentes", delta="- Atenção urgente", delta_color="inverse")
+    # Layout de 3 colunas para exibir os cartões na tela
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric(label="📋 Total de Ações Filtradas", value=f"{total_acoes} itens")
+    with m2:
+        st.metric(label="✅ Taxa de Conclusão", value=f"{taxa_conclusao:.1f}%")
+    with m3:
+        # Destaca em vermelho se houver ações críticas atrasadas
+        if atrasadas > 0:
+            st.metric(label="🚨 Ações Críticas (Atrasadas)", value=f"{atrasadas} pendentes", delta="- Atenção urgente", delta_color="inverse")
+        else:
+            st.metric(label="🛡️ Prazos sob Controle", value="0 atrasos", delta="Em dia")
+
+    st.write("<br>", unsafe_allow_html=True)
+
+             # Renderização do Gráfico Nativo (Substituição Definitiva à Prova de Falhas)
+    st.write("---")
+    st.write("📊 **Progresso dos Planos de Ação**")
+    
+    # Criamos a tabela de forma simplificada a partir dos dados já calculados
+    dados_barras = {
+        "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
+        "Quantidade": [
+            status_contagem.get("Não Iniciado", 0),
+            status_contagem.get("Em Andamento", 0),
+            status_contagem.get("Concluído", 0)
+        ]
+    }
+    df_barras_limpo = pd.DataFrame(dados_barras)
+
+    # Exibe o gráfico de barras vertical nativo do Streamlit (Sem Plotly, Sem Matplotlib)
+    if df_barras_limpo["Quantidade"].sum() > 0:
+        st.bar_chart(
+            df_barras_limpo, 
+            x="Status", 
+            y="Quantidade", 
+            color="Status",
+            # Mapeamento estético de cores direto no componente nativo
+            color_config={
+                "Não Iniciado": "#ff9999",  # Vermelho suave
+                "Em Andamento": "#66b3ff",  # Azul suave
+                "Concluído": "#99ff99"     # Verde suave
+            }
+        )
     else:
-        st.metric(label="🛡️ Prazos sob Controle", value="0 atrasos", delta="Em dia")
-
-st.write("<br>", unsafe_allow_html=True)
-
-# Gráfico Seguro usando Plotly Express (Substitui color_config inválido)
-st.write("📊 **Progresso dos Planos de Ação**")
-
-dados_barras = {
-    "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
-    "Quantidade": [status_contagem["Não Iniciado"], status_contagem["Em Andamento"], status_contagem["Concluído"]]
-}
-df_barras_limpo = pd.DataFrame(dados_barras)
-
-if df_barras_limpo["Quantidade"].sum() > 0:
-    fig = px.bar(
-        df_barras_limpo, 
-        x="Status", 
-        y="Quantidade", 
-        color="Status",
-        color_discrete_map={"Não Iniciado": "#ff9999", "Em Andamento": "#66b3ff", "Concluído": "#99ff99"}
-    )
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.info("💡 Cadastre ações para visualizar o gráfico de barras de monitoramento.")
+        st.info("💡 Cadastre ou selecione ações para visualizar o gráfico de barras de monitoramento.")
 
 # --- LISTAGEM DOS ITENS SALVOS ---
 st.write("---")
@@ -238,13 +231,98 @@ if acoes:
 else:
     st.info("Nenhuma ação cadastrada no sistema até o momento.")
 
-# --- PAINEL OPERACIONAL ---
 st.write("---")
-st.subheader("📝 Painel: Registrar Informações")
+
+# --- CONFIGURAÇÃO DE VALORES PADRÃO ---
+valores_padrao = {
+    "id": "", "descricao": "", "porque": "", "onde": "", 
+    "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
+}
 
 if st.session_state['edit_item']:
+    item = st.session_state['edit_item']
+    valores_padrao = {
+        "id": str(item['id_acao']),
+        "descricao": str(item['descricao_acao']),
+        "porque": str(item['porque']) if item['porque'] else "",
+        "onde": str(item['onde']) if item['onde'] else "",
+        "id_responsavel": str(item['id_responsavel']) if item['id_responsavel'] else "1",
+        "como": str(item['como']) if item['como'] else "",
+        "quando_detalhe": str(item['quando_detalhe']) if item['quando_detalhe'] else "",
+        "status": str(item['status']),
+        "prazo": item['prazo'],
+        "url_arquivo": item.get('url_arquivo')
+    }
     st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
+
+# --- PAINEL OPERACIONAL (ATUALIZADO COM FLUXO DE EDIÇÃO CORRETO) ---
+st.write("---")
+st.subheader("📝 Painel: Registrar Informações")
 
 id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True)
 descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"])
 porque = st.text_input("Por que", value=valores_padrao["porque"])
+onde = st.text_input("Onde", value=valores_padrao["onde"])
+responsavel_id_input = st.text_input("Código do Responsável (ID)", value=valores_padrao["id_responsavel"])
+
+prazo_val = pd.to_datetime(valores_padrao["prazo"]).date() if valores_padrao["prazo"] else pd.Timestamp.now().date()
+prazo = st.date_input("Prazo *", value=prazo_val)
+
+como = st.text_input("Como", value=valores_padrao["como"])
+quando_detalhe = str(st.text_input("Quando (Detalhe)", value=valores_padrao["quando_detalhe"]))
+
+lista_status = ["Não Iniciado", "Em Andamento", "Concluído"]
+status_selecionado = st.selectbox("Status", lista_status, index=lista_status.index(valores_padrao["status"]) if valores_padrao["status"] in lista_status else 0)
+
+arquivo_enviado = st.file_uploader("Anexar evidência ou documento (Opcional)", type=["png", "jpg", "pdf", "docx"])
+
+# --- LÓGICA INTELIGENTE DE BOTÕES (SALVAR VS ATUALIZAR) ---
+if st.session_state['edit_item']:
+    # Se você clicou em editar, aparecem os botões de controle de alteração
+    col_salvar, col_cancelar = st.columns(2)
+    
+    with col_salvar:
+        btn_atualizar = st.button("🔄 Confirmar e Salvar Alterações", use_container_width=True, type="primary")
+    with col_cancelar:
+        btn_cancelar = st.button("❌ Cancelar Edição (Voltar ao Novo)", use_container_width=True)
+        
+    if btn_cancelar:
+        st.session_state['edit_item'] = None
+        st.rerun()
+        
+    if btn_atualizar:
+        if not descricao:
+            st.error("O campo 'Descrição (O que)' é obrigatório.")
+        else:
+            url_doc = valores_padrao["url_arquivo"]
+            if arquivo_enviado:
+                url_doc = fazer_upload_storage(arquivo_enviado)
+                
+            # Envia o ID para a função fazer o UPDATE no Supabase
+            sucesso, msg = salvar_acao_no_banco(
+                id_acao, descricao, porque, onde, responsavel_id_input, 
+                str(prazo), como, quando_detalhe, status_selecionado, url_doc
+            )
+            if sucesso:
+                st.success("Alterações salvas com sucesso!")
+                st.session_state['edit_item'] = None  # Sai do modo edição
+                st.rerun()
+                
+else:
+    # Se você NÃO está editando, exibe o botão padrão de novo cadastro
+    if st.button("💾 Salvar Novo Cadastro", use_container_width=True, type="primary"):
+        if not descricao:
+            st.error("O campo 'Descrição (O que)' é obrigatório.")
+        else:
+            url_doc = None
+            if arquivo_enviado:
+                url_doc = fazer_upload_storage(arquivo_enviado)
+                
+            # Como ID vai vazio, a função faz um INSERT automático no Supabase
+            sucesso, msg = salvar_acao_no_banco(
+                "", descricao, porque, onde, responsavel_id_input, 
+                str(prazo), como, quando_detalhe, status_selecionado, url_doc
+            )
+            if sucesso:
+                st.success("Nova ação cadastrada com sucesso!")
+                st.rerun()
