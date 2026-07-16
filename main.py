@@ -3,15 +3,14 @@ import pandas as pd
 import base64
 import os
 import io
-import plotly.express as px  # Biblioteca estável para gráficos
+import plotly.express as px  
 from supabase import create_client, Client
 
 # Configuração da página Streamlit (DEVE SER A PRIMEIRA LINHA DE CÓDIGO)
 st.set_page_config(page_title="Plano de Ação - Administrativo", layout="wide")
 
 # CONEXÃO DIRETA COM O SUPABASE
-# Lembre-se de preencher com a URL e KEY corretas do seu projeto
-SUPABASE_URL = "https://otlzkpjlzorxdhagqksf.supabase.co" 
+SUPABASE_URL = "https://supabase.co" 
 SUPABASE_KEY = "sb_publishable_UtC2lBc6OwE0ZrWFpL7U9g_VuTjjjSw"
 
 def get_supabase_client() -> Client:
@@ -113,7 +112,7 @@ try:
 except Exception as e:
     st.error(f"Erro ao carregar dados do Supabase: {e}")
 
-# --- CONFIGURAÇÃO DE VALORES PADRÃO (GARANTE ESCOPO CORRETO ANTES DO USO) ---
+# --- CONFIGURAÇÃO DE VALORES PADRÃO ---
 valores_padrao = {
     "id": "", "descricao": "", "porque": "", "onde": "", 
     "como": "", "quando_detalhe": "", "status": "Não Iniciado", "id_responsavel": "1", "prazo": None, "url_arquivo": None
@@ -239,12 +238,13 @@ if acoes:
 else:
     st.info("Nenhuma ação cadastrada no sistema até o momento.")
 
-# --- PAINEL OPERACIONAL DE CADASTRO E EDIÇÃO CORRIGIDO ---
+# --- PAINEL OPERACIONAL DE CADASTRO E EDIÇÃO TOTALMENTE REESTRUTURADO ---
 st.write("---")
 st.subheader("📝 Painel: Registrar Informações")
 
 if st.session_state['edit_item']:
     st.warning(f"📝 Editando Ação ID #{valores_padrao['id']}.")
 
-# Agrupando os campos visuais em um bloco limpo
-id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="input_id_painel")
+# Removidos os formulários internos "st.form" redundantes para evitar travamento de chaves
+id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="p_id")
+descricao = st.text_input("O que (Ação) *", value=valores_padrao["descricao"], key="p_desc")
