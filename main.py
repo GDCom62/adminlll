@@ -135,107 +135,91 @@ if st.session_state['edit_item']:
     }
 
 # --- INDICADORES GRÁFICOS E METRICAS ---
-st.write("---")
-st.subheader("📊 Painel de Monitoramento Geral")
-
-total_acoes = len(acoes)
-concluidas = 0
-atrasadas = 0
-hoje = pd.Timestamp.now().date()
-status_contagem = {"Não Iniciado": 0, "Em Andamento": 0, "Concluído": 0}
-
-if acoes:
-    for a in acoes:
-        status_texto = str(a.get('status', 'Não Iniciado')).strip().title()
-        
-        if "Andamento" in status_texto:
-            status_contagem["Em Andamento"] += 1
-        elif "Concluído" in status_texto or "Concluido" in status_texto:
-            status_contagem["Concluído"] += 1
-            concluidas += 1
-        else:
-            status_contagem["Não Iniciado"] += 1
-            
-        try:
-            data_prazo = pd.to_datetime(a.get('prazo')).date()
-            if data_prazo < hoje and "Concluid" not in status_texto:
-                atrasadas += 1
-        except:
-            pass
-
-taxa_conclusao = (concluidas / total_acoes * 100) if total_acoes > 0 else 0.0
-
-m1, m2, m3 = st.columns(3)
-with m1:
-    st.metric(label="📋 Total de Ações Registradas", value=f"{total_acoes} itens")
-with m2:
-    st.metric(label="✅ Taxa de Conclusão", value=f"{taxa_conclusao:.1f}%")
-with m3:
-    if atrasadas > 0:
-        st.metric(label="🚨 Ações Críticas (Atrasadas)", value=f"{atrasadas} pendentes", delta="- Atenção urgente", delta_color="inverse")
-    else:
-        st.metric(label="🛡️ Prazos sob Controle", value="0 atrasos", delta="Em dia")
-
-st.write("<br>", unsafe_allow_html=True)
-
-# Gráfico Seguro usando Plotly Express
-st.write("📊 **Progresso dos Planos de Ação**")
-
-dados_barras = {
-    "Status": ["Não Iniciado", "Em Andamento", "Concluído"],
-    "Quantidade": [status_contagem["Não Iniciado"], status_contagem["Em Andamento"], status_contagem["Concluído"]]
-}
-df_barras_limpo = pd.DataFrame(dados_barras)
-
-if df_barras_limpo["Quantidade"].sum() > 0:
-    fig = px.bar(
-        df_barras_limpo, 
-        x="Status", 
-        y="Quantidade", 
-        color="Status",
-        color_discrete_map={"Não Iniciado": "#ff9999", "Em Andamento": "#66b3ff", "Concluído": "#99ff99"}
-    )
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.info("💡 Cadastre ações para visualizar o gráfico de barras de monitoramento.")
-
-# --- LISTAGEM DOS ITENS SALVOS ---
+# --- LISTAGEM DOS ITENS SALVOS COM FILTROS E EXCEL ---
 st.write("---")
 st.subheader("📋 Ações Registradas")
 
 if acoes:
-    df_tabela = pd.DataFrame(acoes)
+    # Criamos o DataFrame base com todas as ações do banco
+    df_base = pd.DataFrame(acoes)
+    
+    # Garantimos que as colunas existam para evitar erros de leitura
     colunas_necessarias = ["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]
     for col in colunas_necessarias:
-        if col not in df_tabela.columns:
-            df_tabela[col] = ""
-            
-    df_tabela = df_tabela[colunas_necessarias]
-    df_tabela.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
-    st.dataframe(df_tabela, use_container_width=True, hide_index=True)
+        if col not in df_base.columns:
+            df_base[col] = ""
+
+    # --- BARRA DE FILTROS DINÂMICOS ---
+    st.markdown("🔍 **Filtros de Busca**")
+    f_col1, f_col2 = st.columns(2)
     
+    with f_col1:
+        # Filtro por Status
+        opcoes_status = ["Todos"] + sorted(list(df_base["status"].unique()))
+        status_filtrado = st.selectbox("Filtrar por Status:", opcoes_status, key="filtro_status_dinamico")
+        
+    with f_col2:
+        # Filtro por Responsável
+        opcoes_resp = ["Todos"] + sorted(list(df_base["id_responsavel"].astype(str).unique()))
+        resp_filtrado = st.selectbox("Filtrar por ID do Responsável:", opcoes_resp, key="filtro_resp_dinamico")
+
+    # Aplicando os filtros no DataFrame de exibição
+    df_filtrado = df_base.copy()
+    if status_filtrado != "Todos":
+        df_filtrado = df_filtrado[df_filtrado["status"] == status_filtrado]
+    if resp_filtrado != "Todos":
+        df_filtrado = df_filtrado[df_filtrado["id_responsavel"].astype(str) == resp_filtrado]
+
+    # --- BOTÃO DE EXPORTAR PARA EXCEL ---
+    # Geramos o arquivo em memória para download instantâneo
+    buffer_excel = io.BytesIO()
+    with pd.ExcelWriter(buffer_excel, engine='openpyxl') as writer:
+        df_filtrado[colunas_necessarias].to_excel(writer, index=False, sheet_name='Planos de Ação')
+    
+    st.download_button(
+        label="🟢 Baixar Lista Filtrada em Excel (.xlsx)",
+        data=buffer_excel.getvalue(),
+        file_name=f"plano_de_acao_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="btn_download_excel_unico"
+    )
+    st.write("<br>", unsafe_allow_html=True)
+
+    # Exibindo a tabela filtrada na tela
+    df_exibicao = df_filtrado[colunas_necessarias].copy()
+    df_exibicao.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
+    st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
+    
+    # --- BOTÕES DE GERENCIAMENTO (EDITAR / EXCLUIR) ---
     st.write("**Ações de Gerenciamento:**")
     col_sel, col_btn_ed, col_btn_ex = st.columns(3)
     
     with col_sel:
-        id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", [a['id_acao'] for a in acoes], key="select_id_gerenciamento_definitivo")
+        # O seletor de ID agora mostra apenas os IDs que estão visíveis após o filtro aplicado
+        ids_disponiveis = [a for a in df_filtrado['id_acao']]
+        if ids_disponiveis:
+            id_selecionado = st.selectbox("Selecione o ID de uma ação para modificar:", ids_disponiveis, key="select_id_gerenciamento_definitivo")
+        else:
+            st.caption("Nenhum ID disponível com os filtros atuais.")
+            id_selecionado = None
     
-    with col_btn_ed:
-        if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item_definitivo"):
-            item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
-            if item_procurado:
-                st.session_state['edit_item'] = item_procurado
-                st.rerun()
-                
-    with col_btn_ex:
-        if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item_definitivo"):
-            try:
-                supabase = get_supabase_client()
-                supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
-                st.success(f"Ação ID #{id_selecionado} excluída!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao excluir: {e}")
+    if id_selecionado:
+        with col_btn_ed:
+            if st.button("✏️ Editar Selecionado", use_container_width=True, key="btn_editar_item_definitivo"):
+                item_procurado = next((item for item in acoes if item["id_acao"] == id_selecionado), None)
+                if item_procurado:
+                    st.session_state['edit_item'] = item_procurado
+                    st.rerun()
+                    
+        with col_btn_ex:
+            if st.button("🗑️ Excluir Selecionado", use_container_width=True, key="btn_excluir_item_definitivo"):
+                try:
+                    supabase = get_supabase_client()
+                    supabase.table("Acoes").delete().eq("id_acao", id_selecionado).execute()
+                    st.success(f"Ação ID #{id_selecionado} excluída!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao excluir: {e}")
 else:
     st.info("Nenhuma ação cadastrada no sistema até o momento.")
 
