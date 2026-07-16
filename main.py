@@ -4,6 +4,7 @@ import base64
 import os
 import io
 import plotly.express as px  
+from datetime import datetime 
 from supabase import create_client, Client
 
 # Configuração da página Streamlit (DEVE SER A PRIMEIRA LINHA DE CÓDIGO)
