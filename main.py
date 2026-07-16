@@ -316,3 +316,54 @@ if st.session_state['edit_item']:
 
 # Chaves totalmente únicas usando o prefixo "reg_" para evitar colisões
 id_acao = st.text_input("ID da Ação", value=valores_padrao["id"], disabled=True, key="reg_id")
+
+# --- LISTAGEM DOS ITENS SALVOS COM FILTROS E EXCEL ---
+st.write("---")
+st.subheader("📋 Ações Registradas")
+
+if acoes:
+    df_base = pd.DataFrame(acoes)
+    colunas_necessarias = ["id_acao", "descricao_acao", "porque", "onde", "id_responsavel", "prazo", "como", "quando_detalhe", "status", "url_arquivo"]
+    for col in colunas_necessarias:
+        if col not in df_base.columns:
+            df_base[col] = ""
+
+    st.markdown("🔍 **Filtros de Busca**")
+    f_col1, f_col2 = st.columns(2)
+    
+    with f_col1:
+        opcoes_status = ["Todos"] + sorted(list(df_base["status"].unique()))
+        status_filtrado = st.selectbox("Filtrar por Status:", opcoes_status, key="filtro_status_dinamico")
+        
+    with f_col2:
+        opcoes_resp = ["Todos"] + sorted(list(df_base["id_responsavel"].astype(str).unique()))
+        resp_filtrado = st.selectbox("Filtrar por ID do Responsável:", opcoes_resp, key="filtro_resp_dinamico")
+
+    df_filtrado = df_base.copy()
+    if status_filtrado != "Todos":
+        df_filtrado = df_filtrado[df_filtrado["status"] == status_filtrado]
+    if resp_filtrado != "Todos":
+        df_filtrado = df_filtrado[df_filtrado["id_responsavel"].astype(str) == resp_filtrado]
+
+    buffer_excel = io.BytesIO()
+    with pd.ExcelWriter(buffer_excel, engine='openpyxl') as writer:
+        df_filtrado[colunas_necessarias].to_excel(writer, index=False, sheet_name='Planos de Ação')
+    
+    st.download_button(
+        label="🟢 Baixar Lista Filtrada em Excel (.xlsx)",
+        data=buffer_excel.getvalue(),
+        file_name=f"plano_de_acao_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="btn_download_excel_unico"
+    )
+    st.write("<br>", unsafe_allow_html=True)
+
+    df_exibicao = df_filtrado[colunas_necessarias].copy()
+    df_exibicao.columns = ["ID", "Descrição (O que)", "Por que", "Onde", "ID Resp.", "Prazo", "Como", "Quando Det.", "Status", "Link Arquivo"]
+    st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
+    
+    st.write("**Ações de Gerenciamento:**")
+    
+    ids_disponiveis = [a for a in df_filtrado['id_acao']]
+    
+    # ESTRUTURA LINEAR REFEITA TOTALMENTE SEM CONFLITOS DE RECUO INDENTADO
